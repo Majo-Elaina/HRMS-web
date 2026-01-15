@@ -5,12 +5,60 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, BarChart, LineChart } from 'echarts/charts'
 import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
-import { statistics, employees, leaveRequests } from '@/mock'
+import { statistics, employees, positions, departments, leaveRequests } from '@/mock'
 import { useUserStore } from '@/stores/user'
 
 use([CanvasRenderer, PieChart, BarChart, LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const userStore = useUserStore()
+const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
+
+const getDeptName = (deptId) => departments.find(d => d.deptId === deptId)?.deptName || '-'
+const getPositionName = (positionId) => positions.find(p => p.positionId === positionId)?.positionName || '-'
+
+const getEmployeeTag = (empId) => {
+  const emp = employees.find(item => item.empId === empId)
+  const deptName = getDeptName(emp?.deptId)
+  const positionName = getPositionName(emp?.positionId)
+  const roleCode = positionName.includes('经理') ? 'MANAGER' : 'EMPLOYEE'
+  return userStore.getIdentityTagByEmpId(empId, { roleCode, deptName, positionName })
+}
+
+const matchDays = (rule, days) => {
+  if (rule.daysOp === 'any') return true
+  if (rule.daysOp === '<=') return days <= rule.daysValue
+  if (rule.daysOp === '>') return days > rule.daysValue
+  return false
+}
+
+const matchRule = (rule, applicantTag, days) => {
+  if (!userStore.matchIdentityTag(rule.applicantTag, applicantTag)) return false
+  return matchDays(rule, days)
+}
+
+const getMatchedRule = (leave) => {
+  const applicantTag = getEmployeeTag(leave.empId)
+  const rules = userStore.getLeaveApprovalRules()
+  const exact = rules.find(rule => rule.applicantTag === applicantTag && matchDays(rule, leave.days))
+  return exact || rules.find(rule => matchRule(rule, applicantTag, leave.days))
+}
+
+const normalizeStatus = (status) => {
+  const legacyStatusMap = {
+    'HR已批': '已通过',
+    '部门经理已批': '已通过',
+    '待经理审批': '待二级审批'
+  }
+  return legacyStatusMap[status] || status
+}
+
+const getPendingApprover = (leave) => {
+  const status = normalizeStatus(leave.status)
+  const rule = getMatchedRule(leave)
+  if (status === '待审批') return { tag: rule?.firstApproverTag || 'ADMIN', scope: 'company' }
+  if (status === '待二级审批') return { tag: rule?.secondApproverTag || '', scope: rule?.secondApproverScope || 'dept' }
+  return { tag: '', scope: 'company' }
+}
 
 // 部门人员分布图
 const deptChartOption = ref({
@@ -63,15 +111,26 @@ const salaryChartOption = ref({
 
 // 待处理请假
 const pendingLeaves = computed(() => {
-  const baseLeaves = leaveRequests.filter(l => l.status === '待审批' || l.status === '部门经理已批')
-  if (userStore.canAccessAllDepartments) return baseLeaves
-  if (userStore.isDepartmentManager) {
-    return baseLeaves.filter(l => employees.find(e => e.empId === l.empId)?.deptId === userStore.deptId)
-  }
-  if (userStore.isEmployee) {
-    return baseLeaves.filter(l => l.empId === userStore.empId)
-  }
-  return baseLeaves
+  return leaveRequests
+    .map(item => ({ ...item, status: normalizeStatus(item.status) }))
+    .filter(l => l.status === '待审批' || l.status === '待二级审批')
+    .filter(l => {
+      const emp = employees.find(e => e.empId === l.empId)
+      if (leaveScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
+      if (leaveScope.value === 'self' && l.empId !== userStore.empId) return false
+      return true
+    })
+    .filter(l => {
+      if (!userStore.hasPermission('attendance:leave:approve')) return false
+      const pending = getPendingApprover(l)
+      if (!pending.tag) return false
+      if (!userStore.matchIdentityTag(pending.tag, userStore.identityTag)) return false
+      if (pending.scope === 'dept') {
+        const emp = employees.find(e => e.empId === l.empId)
+        return emp?.deptId === userStore.deptId
+      }
+      return true
+    })
 })
 </script>
 
@@ -175,7 +234,7 @@ const pendingLeaves = computed(() => {
             <el-table-column prop="days" label="天数" width="50" />
             <el-table-column prop="status" label="状态">
               <template #default="{ row }">
-                <el-tag :type="row.status === '待审批' ? 'warning' : 'primary'" size="small">
+                <el-tag :type="row.status === '待审批' || row.status === '待二级审批' ? 'warning' : 'primary'" size="small">
                   {{ row.status }}
                 </el-tag>
               </template>

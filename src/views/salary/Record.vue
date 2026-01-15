@@ -53,19 +53,23 @@ const rules = {
   baseSalary: [{ required: true, message: '请输入基本工资', trigger: 'blur' }]
 }
 
-const visibleEmployees = computed(() => {
-  if (userStore.canAccessSalaryAll) return employees
-  if (userStore.isEmployee) {
-    return employees.filter(emp => emp.empId === userStore.empId)
-  }
-  return employees
-})
+const salaryScope = computed(() => userStore.getModuleScope('salary:record'))
+const isFinanceSpecialist = computed(() => userStore.matchIdentityTag('FINANCE_SPECIALIST', userStore.identityTag))
+
+const filterEmployeesByScope = (list, scopeValue) => {
+  if (scopeValue === 'company') return list
+  if (scopeValue === 'dept') return list.filter(emp => emp.deptId === userStore.deptId)
+  if (scopeValue === 'self') return list.filter(emp => emp.empId === userStore.empId)
+  return list
+}
+
+const visibleEmployees = computed(() => filterEmployeesByScope(employees, salaryScope.value))
 
 const filteredSalaries = computed(() => {
   return salaryRecords.value.filter(s => {
     const emp = employees.find(e => e.empId === s.empId)
-    if (userStore.isEmployee && !userStore.canAccessSalaryAll && s.empId !== userStore.empId) return false
-    if (!userStore.canAccessSalaryAll && userStore.isDepartmentManager && emp?.deptId !== userStore.deptId) return false
+    if (salaryScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
+    if (salaryScope.value === 'self' && s.empId !== userStore.empId) return false
     const matchName = !searchForm.empName || s.empName.includes(searchForm.empName)
     const matchMonth = !searchForm.salaryMonth || s.salaryMonth === searchForm.salaryMonth
     const matchStatus = !searchForm.status
@@ -114,7 +118,7 @@ const handleSubmit = async () => {
     if (valid) {
       const emp = employees.find(e => e.empId === form.empId)
       const { gross, net } = calculateSalary()
-      const resolvedStatus = userStore.isFinance
+      const resolvedStatus = isFinanceSpecialist.value
         ? '待提交'
         : (form.status || '待发放')
       

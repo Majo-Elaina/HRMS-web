@@ -19,6 +19,7 @@ const ALL_PERMISSIONS = [
   'salary:config:add', 'salary:config:edit', 'salary:config:submit', 'salary:config:approve',
   'permission', 'permission:user', 'permission:role',
   'permission:user:view', 'permission:role:view', 'permission:dept-template:view',
+  'permission:identity:view', 'permission:module-scope:view', 'permission:approval-rule:view',
   'permission:user:add', 'permission:user:edit', 'permission:user:delete',
   'permission:role:add', 'permission:role:edit', 'permission:role:delete', 'permission:role:perm',
   'report', 'report:view'
@@ -92,11 +93,191 @@ const ACCOUNT_PASSWORDS = {
   finance_chen: '123456'
 }
 
+export const IDENTITY_TAG_OPTIONS = [
+  { value: 'ADMIN', label: '管理员' },
+  { value: 'HR_MANAGER', label: 'HR经理' },
+  { value: 'HR_SPECIALIST', label: 'HR专员' },
+  { value: 'FINANCE_MANAGER', label: '财务经理' },
+  { value: 'FINANCE_SPECIALIST', label: '财务专员' },
+  { value: 'MANAGER', label: '部门经理' },
+  { value: 'EMPLOYEE', label: '普通员工' }
+]
+
+export const MODULE_SCOPE_OPTIONS = [
+  { value: 'self', label: '仅本人' },
+  { value: 'dept', label: '本部门' },
+  { value: 'company', label: '全公司' }
+]
+
 const DEPT_TEMPLATE_KEY = 'dept_permissions'
 const DEFAULT_DEPT_TEMPLATES = {
-  '人力资源部': ['dashboard', 'base', 'attendance', 'report', 'salary:record'],
+  '人力资源部': ['dashboard', 'base', 'attendance', 'report'],
   '财务部': ['dashboard', 'salary', 'report'],
-  '_default': ['dashboard', 'attendance', 'salary:record']
+  '_default': ['dashboard', 'attendance', 'base']
+}
+
+const IDENTITY_TAG_STORAGE_KEY = 'user_identity_tags'
+const MODULE_SCOPE_STORAGE_KEY = 'module_data_scopes'
+const LEAVE_APPROVAL_RULES_KEY = 'leave_approval_rules'
+const APPROVAL_RULES_KEY = 'approval_rules'
+const APPROVAL_RULE_TYPES_KEY = 'approval_rule_types'
+
+const DEFAULT_MODULE_SCOPES = {
+  'base:employee': {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      HR_SPECIALIST: 'company',
+      HR_MANAGER: 'company',
+      FINANCE_SPECIALIST: 'dept',
+      FINANCE_MANAGER: 'dept',
+      MANAGER: 'dept',
+      EMPLOYEE: 'self'
+    }
+  },
+  'base:department': {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      HR_SPECIALIST: 'company',
+      HR_MANAGER: 'company',
+      FINANCE_SPECIALIST: 'dept',
+      FINANCE_MANAGER: 'dept',
+      MANAGER: 'dept',
+      EMPLOYEE: 'dept'
+    }
+  },
+  'base:position': {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      HR_SPECIALIST: 'company',
+      HR_MANAGER: 'company',
+      FINANCE_SPECIALIST: 'dept',
+      FINANCE_MANAGER: 'dept',
+      MANAGER: 'dept',
+      EMPLOYEE: 'dept'
+    }
+  },
+  'attendance:record': {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      HR_SPECIALIST: 'company',
+      HR_MANAGER: 'company',
+      MANAGER: 'dept',
+      EMPLOYEE: 'self'
+    }
+  },
+  'attendance:leave': {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      HR_SPECIALIST: 'company',
+      HR_MANAGER: 'company',
+      MANAGER: 'dept',
+      EMPLOYEE: 'self'
+    }
+  },
+  'salary:record': {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      FINANCE_SPECIALIST: 'company',
+      FINANCE_MANAGER: 'company'
+    }
+  },
+  'salary:config': {
+    default: 'company',
+    tagScopes: {
+      ADMIN: 'company',
+      FINANCE_SPECIALIST: 'company',
+      FINANCE_MANAGER: 'company'
+    }
+  },
+  report: {
+    default: 'dept',
+    tagScopes: {
+      ADMIN: 'company',
+      HR_SPECIALIST: 'company',
+      HR_MANAGER: 'company',
+      FINANCE_SPECIALIST: 'company',
+      FINANCE_MANAGER: 'company',
+      MANAGER: 'dept',
+      EMPLOYEE: 'self'
+    }
+  }
+}
+
+const DEFAULT_LEAVE_APPROVAL_RULES = [
+  {
+    id: 1,
+    applicantTag: 'EMPLOYEE',
+    daysOp: '<=',
+    daysValue: 3,
+    firstApproverTag: 'HR_SPECIALIST',
+    secondApproverTag: '',
+    secondApproverScope: 'dept'
+  },
+  {
+    id: 2,
+    applicantTag: 'EMPLOYEE',
+    daysOp: '>',
+    daysValue: 3,
+    firstApproverTag: 'HR_SPECIALIST',
+    secondApproverTag: 'MANAGER',
+    secondApproverScope: 'dept'
+  },
+  {
+    id: 3,
+    applicantTag: 'MANAGER',
+    daysOp: 'any',
+    daysValue: 0,
+    firstApproverTag: 'HR_MANAGER',
+    secondApproverTag: '',
+    secondApproverScope: 'dept'
+  },
+  {
+    id: 4,
+    applicantTag: 'HR_MANAGER',
+    daysOp: 'any',
+    daysValue: 0,
+    firstApproverTag: 'ADMIN',
+    secondApproverTag: '',
+    secondApproverScope: 'dept'
+  }
+]
+
+const DEFAULT_APPROVAL_RULE_TYPES = [
+  { type: 'leave', name: '请假审批规则', desc: '请假申请的审批流程' },
+  { type: 'salary_record', name: '薪资记录审批规则', desc: '薪资记录提交与审批流程' },
+  { type: 'salary_config', name: '薪资配置审批规则', desc: '薪资配置提交与审批流程' }
+]
+
+const DEFAULT_APPROVAL_RULES = {
+  leave: [...DEFAULT_LEAVE_APPROVAL_RULES],
+  salary_record: [
+    {
+      id: 1,
+      applicantTag: 'FINANCE_SPECIALIST',
+      daysOp: 'any',
+      daysValue: 0,
+      firstApproverTag: 'FINANCE_MANAGER',
+      secondApproverTag: '',
+      secondApproverScope: 'company'
+    }
+  ],
+  salary_config: [
+    {
+      id: 1,
+      applicantTag: 'FINANCE_SPECIALIST',
+      daysOp: 'any',
+      daysValue: 0,
+      firstApproverTag: 'FINANCE_MANAGER',
+      secondApproverTag: '',
+      secondApproverScope: 'company'
+    }
+  ]
 }
 
 const loadDeptTemplates = () => {
@@ -104,7 +285,15 @@ const loadDeptTemplates = () => {
   if (!stored) return { ...DEFAULT_DEPT_TEMPLATES }
   try {
     const parsed = JSON.parse(stored)
-    return parsed && typeof parsed === 'object' ? parsed : { ...DEFAULT_DEPT_TEMPLATES }
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_DEPT_TEMPLATES }
+    const normalized = {}
+    Object.keys(parsed).forEach(key => {
+      normalized[key] = (parsed[key] || []).map(item => {
+        if (item === 'salary:record' || item === 'salary:config') return 'salary'
+        return item
+      })
+    })
+    return { ...DEFAULT_DEPT_TEMPLATES, ...normalized }
   } catch {
     return { ...DEFAULT_DEPT_TEMPLATES }
   }
@@ -118,6 +307,147 @@ const getDeptPermissionPrefixes = (deptName) => {
 const filterPermissionsByDept = (rolePerms, deptPrefixes) => {
   if (!deptPrefixes?.length) return rolePerms
   return rolePerms.filter(perm => deptPrefixes.some(prefix => perm === prefix || perm.startsWith(prefix + ':')))
+}
+
+const loadIdentityTags = () => {
+  const stored = localStorage.getItem(IDENTITY_TAG_STORAGE_KEY)
+  if (!stored) return {}
+  try {
+    const parsed = JSON.parse(stored)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+const resolveIdentityTag = ({ roleCode, deptName, positionName }) => {
+  if (roleCode === 'ADMIN') return 'ADMIN'
+  if (deptName === '人力资源部') {
+    return positionName?.includes('经理') ? 'HR_MANAGER' : 'HR_SPECIALIST'
+  }
+  if (deptName === '财务部') {
+    return positionName?.includes('经理') ? 'FINANCE_MANAGER' : 'FINANCE_SPECIALIST'
+  }
+  if (roleCode === 'MANAGER') return 'MANAGER'
+  return 'EMPLOYEE'
+}
+
+const getIdentityTagAliases = (tag) => {
+  const aliasMap = {
+    ADMIN: ['ADMIN'],
+    HR_MANAGER: ['HR_MANAGER', 'MANAGER'],
+    HR_SPECIALIST: ['HR_SPECIALIST', 'EMPLOYEE'],
+    FINANCE_MANAGER: ['FINANCE_MANAGER', 'MANAGER'],
+    FINANCE_SPECIALIST: ['FINANCE_SPECIALIST', 'EMPLOYEE'],
+    MANAGER: ['MANAGER'],
+    EMPLOYEE: ['EMPLOYEE']
+  }
+  return aliasMap[tag] || [tag].filter(Boolean)
+}
+
+const matchIdentityTag = (expectedTag, actualTag) => {
+  if (expectedTag === '*' || expectedTag === 'ANY') return true
+  return getIdentityTagAliases(actualTag).includes(expectedTag)
+}
+
+const getIdentityTagByEmpId = (empId, fallback) => {
+  const stored = loadIdentityTags()
+  if (stored && stored[empId]) return stored[empId]
+  return resolveIdentityTag(fallback)
+}
+
+const normalizeModuleScopes = (scopes) => {
+  const normalized = {}
+  Object.keys(DEFAULT_MODULE_SCOPES).forEach(code => {
+    const base = DEFAULT_MODULE_SCOPES[code]
+    const stored = scopes?.[code]
+    normalized[code] = {
+      default: stored?.default || base.default,
+      tagScopes: {
+        ...base.tagScopes,
+        ...(stored?.tagScopes || {})
+      }
+    }
+  })
+  return normalized
+}
+
+const loadModuleScopes = () => {
+  const stored = localStorage.getItem(MODULE_SCOPE_STORAGE_KEY)
+  if (!stored) return normalizeModuleScopes()
+  try {
+    const parsed = JSON.parse(stored)
+    return normalizeModuleScopes(parsed && typeof parsed === 'object' ? parsed : {})
+  } catch {
+    return normalizeModuleScopes()
+  }
+}
+
+const getModuleScopeByTag = (moduleCode, tag) => {
+  const scopes = loadModuleScopes()
+  const moduleScope = scopes[moduleCode] || DEFAULT_MODULE_SCOPES[moduleCode]
+  if (!moduleScope) return 'dept'
+  const tags = getIdentityTagAliases(tag)
+  for (const t of tags) {
+    if (moduleScope.tagScopes?.[t]) return moduleScope.tagScopes[t]
+  }
+  return moduleScope.default || 'dept'
+}
+
+const loadLeaveApprovalRules = () => {
+  const stored = localStorage.getItem(LEAVE_APPROVAL_RULES_KEY)
+  if (!stored) return [...DEFAULT_LEAVE_APPROVAL_RULES]
+  try {
+    const parsed = JSON.parse(stored)
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_LEAVE_APPROVAL_RULES]
+  } catch {
+    return [...DEFAULT_LEAVE_APPROVAL_RULES]
+  }
+}
+
+const normalizeApprovalRules = (rulesByType = {}) => {
+  const normalized = {}
+  const types = Object.keys(DEFAULT_APPROVAL_RULES)
+  types.forEach(type => {
+    const storedRules = rulesByType[type]
+    if (Array.isArray(storedRules) && storedRules.length) {
+      normalized[type] = storedRules
+    } else {
+      normalized[type] = [...DEFAULT_APPROVAL_RULES[type]]
+    }
+  })
+  Object.keys(rulesByType).forEach(type => {
+    if (!normalized[type] && Array.isArray(rulesByType[type])) {
+      normalized[type] = rulesByType[type]
+    }
+  })
+  return normalized
+}
+
+const loadApprovalRuleTypes = () => {
+  const stored = localStorage.getItem(APPROVAL_RULE_TYPES_KEY)
+  if (!stored) return [...DEFAULT_APPROVAL_RULE_TYPES]
+  try {
+    const parsed = JSON.parse(stored)
+    return Array.isArray(parsed) ? parsed : [...DEFAULT_APPROVAL_RULE_TYPES]
+  } catch {
+    return [...DEFAULT_APPROVAL_RULE_TYPES]
+  }
+}
+
+const loadApprovalRules = () => {
+  const stored = localStorage.getItem(APPROVAL_RULES_KEY)
+  if (!stored) {
+    const legacyLeave = loadLeaveApprovalRules()
+    return normalizeApprovalRules({ leave: legacyLeave })
+  }
+  try {
+    const parsed = JSON.parse(stored)
+    return normalizeApprovalRules(parsed && typeof parsed === 'object' ? parsed : {})
+  } catch {
+    const legacyLeave = loadLeaveApprovalRules()
+    return normalizeApprovalRules({ leave: legacyLeave })
+  }
 }
 
 const getRolePermissions = (roleCode, deptName) => {
@@ -136,6 +466,11 @@ const buildUserProfile = (baseUser) => {
   const position = positions.find(p => p.positionId === emp?.positionId)
   const roleCode = role?.roleCode || baseUser.roleCode || ''
   const roleName = role?.roleName || baseUser.roleName || ''
+  const identityTag = getIdentityTagByEmpId(emp?.empId ?? baseUser.empId, {
+    roleCode,
+    deptName: dept?.deptName ?? baseUser.deptName,
+    positionName: position?.positionName ?? baseUser.positionName
+  })
 
   return {
     ...baseUser,
@@ -147,6 +482,7 @@ const buildUserProfile = (baseUser) => {
     positionName: position?.positionName ?? baseUser.positionName,
     roleCode,
     roleName,
+    identityTag,
     permissions: getRolePermissions(roleCode, dept?.deptName)
   }
 }
@@ -158,21 +494,17 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!token.value)
   const permissions = computed(() => user.value?.permissions || [])
   const roleCode = computed(() => user.value?.roleCode || '')
+  const identityTag = computed(() => user.value?.identityTag || '')
   const empId = computed(() => user.value?.empId || null)
   const deptId = computed(() => user.value?.deptId || null)
   const deptName = computed(() => user.value?.deptName || '')
   const positionName = computed(() => user.value?.positionName || '')
 
   const isAdmin = computed(() => roleCode.value === 'ADMIN')
-  const isHr = computed(() => roleCode.value === 'HR' || roleCode.value === 'HR_MANAGER')
-  const isFinance = computed(() => roleCode.value === 'FINANCE')
-  const isFinanceManager = computed(() => roleCode.value === 'FINANCE_MANAGER')
-  const isDepartmentManager = computed(() => roleCode.value === 'MANAGER' || roleCode.value === 'FINANCE_MANAGER')
-  const isEmployee = computed(() => roleCode.value === 'EMPLOYEE')
-  const isHrDept = computed(() => deptName.value === '人力资源部')
-  const isFinanceDept = computed(() => deptName.value === '财务部')
-  const canAccessAllDepartments = computed(() => isAdmin.value || isHrDept.value)
-  const canAccessSalaryAll = computed(() => isAdmin.value || isHrDept.value || isFinanceDept.value)
+  const identityTagAliases = computed(() => getIdentityTagAliases(identityTag.value))
+
+  const hasIdentityTag = (tag) => matchIdentityTag(tag, identityTag.value)
+  const getModuleScope = (moduleCode, tag = identityTag.value) => getModuleScopeByTag(moduleCode, tag)
 
   // 登录
   function login(username, password) {
@@ -216,8 +548,14 @@ export const useUserStore = defineStore('user', () => {
 
   function refreshPermissions() {
     if (!user.value) return
+    const refreshedIdentityTag = getIdentityTagByEmpId(user.value.empId, {
+      roleCode: user.value.roleCode,
+      deptName: user.value.deptName,
+      positionName: user.value.positionName
+    })
     user.value = {
       ...user.value,
+      identityTag: refreshedIdentityTag,
       permissions: getRolePermissions(user.value.roleCode, user.value.deptName)
     }
     localStorage.setItem('user', JSON.stringify(user.value))
@@ -237,30 +575,77 @@ export const useUserStore = defineStore('user', () => {
     return false
   }
 
+  const getIdentityTags = () => loadIdentityTags()
+  const saveIdentityTags = (tags) => {
+    localStorage.setItem(IDENTITY_TAG_STORAGE_KEY, JSON.stringify(tags))
+    refreshPermissions()
+  }
+
+  const getModuleScopes = () => loadModuleScopes()
+  const saveModuleScopes = (scopes) => {
+    localStorage.setItem(MODULE_SCOPE_STORAGE_KEY, JSON.stringify(scopes))
+    refreshPermissions()
+  }
+
+  const getApprovalRuleTypes = () => loadApprovalRuleTypes()
+  const saveApprovalRuleTypes = (types) => {
+    localStorage.setItem(APPROVAL_RULE_TYPES_KEY, JSON.stringify(types))
+  }
+
+  const getApprovalRules = () => loadApprovalRules()
+  const getApprovalRulesByType = (type) => {
+    const rules = loadApprovalRules()
+    return rules[type] ? [...rules[type]] : []
+  }
+  const saveApprovalRules = (rulesByType) => {
+    localStorage.setItem(APPROVAL_RULES_KEY, JSON.stringify(rulesByType))
+  }
+  const saveApprovalRulesByType = (type, rules) => {
+    const stored = loadApprovalRules()
+    stored[type] = rules
+    saveApprovalRules(stored)
+    if (type === 'leave') {
+      localStorage.setItem(LEAVE_APPROVAL_RULES_KEY, JSON.stringify(rules))
+    }
+  }
+
+  const getLeaveApprovalRules = () => getApprovalRulesByType('leave')
+  const saveLeaveApprovalRules = (rules) => saveApprovalRulesByType('leave', rules)
+
   return {
     user,
     token,
     isLoggedIn,
     permissions,
     roleCode,
+    identityTag,
     empId,
     deptId,
     deptName,
     positionName,
     isAdmin,
-    isHr,
-    isFinance,
-    isFinanceManager,
-    isDepartmentManager,
-    isEmployee,
-    isHrDept,
-    isFinanceDept,
-    canAccessAllDepartments,
-    canAccessSalaryAll,
+    identityTagAliases,
     login,
     logout,
     restoreLogin,
     refreshPermissions,
-    hasPermission
+    hasPermission,
+    hasIdentityTag,
+    getIdentityTagAliases,
+    matchIdentityTag,
+    getIdentityTagByEmpId,
+    getModuleScope,
+    getIdentityTags,
+    saveIdentityTags,
+    getModuleScopes,
+    saveModuleScopes,
+    getApprovalRuleTypes,
+    saveApprovalRuleTypes,
+    getApprovalRules,
+    getApprovalRulesByType,
+    saveApprovalRules,
+    saveApprovalRulesByType,
+    getLeaveApprovalRules,
+    saveLeaveApprovalRules
   }
 })

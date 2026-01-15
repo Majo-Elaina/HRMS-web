@@ -48,7 +48,10 @@ const menuList = computed(() => {
       children: [
         { index: '/permission/user', title: '用户管理', icon: 'UserFilled', permission: 'permission:user:view' },
         { index: '/permission/role', title: '角色管理', icon: 'Avatar', permission: 'permission:role:view' },
-        { index: '/permission/dept-template', title: '部门权限', icon: 'Tickets', permission: 'permission:dept-template:view' }
+        { index: '/permission/dept-template', title: '部门权限', icon: 'Tickets', permission: 'permission:dept-template:view' },
+        { index: '/permission/identity', title: '身份标签', icon: 'UserFilled', permission: 'permission:identity:view' },
+        { index: '/permission/module-scope', title: '模块范围', icon: 'List', permission: 'permission:module-scope:view' },
+        { index: '/permission/approval-rule', title: '审批规则', icon: 'Document', permission: 'permission:approval-rule:view' }
       ]
     },
     { index: '/report', title: '数据报表', icon: 'DataAnalysis', permission: 'report:view' }

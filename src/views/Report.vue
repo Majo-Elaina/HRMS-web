@@ -13,14 +13,18 @@ use([CanvasRenderer, PieChart, BarChart, LineChart, TitleComponent, TooltipCompo
 const userStore = useUserStore()
 const activeTab = ref('employee')
 
+const reportScope = computed(() => userStore.getModuleScope('report'))
+const salaryScope = computed(() => userStore.getModuleScope('salary:record'))
+
 const visibleDepartments = computed(() => {
-  if (userStore.canAccessAllDepartments) return departments
+  if (reportScope.value === 'company') return departments
   return departments.filter(d => d.deptId === userStore.deptId)
 })
 
 const visibleEmployees = computed(() => {
-  if (userStore.canAccessAllDepartments) return employees
-  return employees.filter(emp => emp.deptId === userStore.deptId)
+  if (reportScope.value === 'company') return employees
+  if (reportScope.value === 'dept') return employees.filter(emp => emp.deptId === userStore.deptId)
+  return employees.filter(emp => emp.empId === userStore.empId)
 })
 
 // 员工性别分布
@@ -69,7 +73,7 @@ const statusChartOption = computed(() => ({
 
 // 部门人员分布
 const deptStats = computed(() => {
-  if (userStore.canAccessAllDepartments) return statistics.departmentStats
+  if (reportScope.value === 'company') return statistics.departmentStats
   const deptMap = visibleEmployees.value.reduce((acc, emp) => {
     acc[emp.deptId] = (acc[emp.deptId] || 0) + 1
     return acc
@@ -151,7 +155,7 @@ const deptNames = departments.map(d => d.deptName)
 const deptSalaryData = [33000, 17500, 16000, 22000, 15000, 12000, 11000]
 const deptSalaryOption = computed(() => {
   const visibleDeptNames = visibleDepartments.value.map(d => d.deptName)
-  const visibleDeptSalary = userStore.canAccessSalaryAll
+  const visibleDeptSalary = salaryScope.value === 'company'
     ? deptSalaryData
     : visibleDeptNames.map(name => {
         const index = deptNames.indexOf(name)

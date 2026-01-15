@@ -23,13 +23,16 @@ const rules = {
   deptId: [{ required: true, message: '请选择所属部门', trigger: 'change' }]
 }
 
+const positionScope = computed(() => userStore.getModuleScope('base:position'))
+const departmentScope = computed(() => userStore.getModuleScope('base:department'))
+
 const visibleDepartments = computed(() => {
-  if (userStore.canAccessAllDepartments) return departments
+  if (departmentScope.value === 'company') return departments
   return departments.filter(d => d.deptId === userStore.deptId)
 })
 
 const visiblePositions = computed(() => {
-  if (userStore.canAccessAllDepartments) return positions.value
+  if (positionScope.value === 'company') return positions.value
   return positions.value.filter(p => p.deptId === userStore.deptId)
 })
 

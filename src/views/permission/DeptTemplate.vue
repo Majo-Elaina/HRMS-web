@@ -6,9 +6,31 @@ import { useUserStore } from '@/stores/user'
 
 const STORAGE_KEY = 'dept_permissions'
 const DEFAULT_TEMPLATES = {
-  '人力资源部': ['dashboard', 'base', 'attendance', 'report', 'salary:record'],
+  '人力资源部': ['dashboard', 'base', 'attendance', 'report'],
   '财务部': ['dashboard', 'salary', 'report'],
-  '_default': ['dashboard', 'attendance', 'salary:record']
+  '_default': ['dashboard', 'attendance', 'base']
+}
+
+const moduleOptions = [
+  { label: '首页', value: 'dashboard' },
+  { label: '基础信息', value: 'base' },
+  { label: '考勤管理', value: 'attendance' },
+  { label: '薪酬管理', value: 'salary' },
+  { label: '数据报表', value: 'report' }
+]
+
+const moduleValueSet = new Set(moduleOptions.map(item => item.value))
+const moduleLabelMap = moduleOptions.reduce((acc, item) => {
+  acc[item.value] = item.label
+  return acc
+}, {})
+
+const normalizeModules = (modules = []) => {
+  const mapped = modules.map(m => {
+    if (m === 'salary:record' || m === 'salary:config') return 'salary'
+    return m
+  })
+  return Array.from(new Set(mapped.filter(m => moduleValueSet.has(m))))
 }
 
 const loadTemplates = () => {
@@ -16,7 +38,12 @@ const loadTemplates = () => {
   if (!stored) return { ...DEFAULT_TEMPLATES }
   try {
     const parsed = JSON.parse(stored)
-    return parsed && typeof parsed === 'object' ? parsed : { ...DEFAULT_TEMPLATES }
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_TEMPLATES }
+    const normalized = {}
+    Object.keys(parsed).forEach(key => {
+      normalized[key] = normalizeModules(parsed[key])
+    })
+    return { ...DEFAULT_TEMPLATES, ...normalized }
   } catch {
     return { ...DEFAULT_TEMPLATES }
   }
@@ -32,25 +59,11 @@ const form = reactive({
   modules: []
 })
 
-const moduleOptions = [
-  { label: '首页', value: 'dashboard' },
-  { label: '基础信息', value: 'base' },
-  { label: '考勤管理', value: 'attendance' },
-  { label: '薪资记录', value: 'salary:record' },
-  { label: '薪资配置', value: 'salary:config' },
-  { label: '数据报表', value: 'report' }
-]
-
-const moduleLabelMap = moduleOptions.reduce((acc, item) => {
-  acc[item.value] = item.label
-  return acc
-}, {})
-
 const deptOptions = departments.map(d => d.deptName)
 
 const handleEdit = (deptName) => {
   form.deptName = deptName
-  form.modules = [...(templates.value[deptName] || [])]
+  form.modules = [...normalizeModules(templates.value[deptName] || [])]
   dialogVisible.value = true
 }
 
@@ -65,7 +78,7 @@ const handleSave = () => {
     ElMessage.warning('请选择部门')
     return
   }
-  templates.value[form.deptName] = [...form.modules]
+  templates.value[form.deptName] = normalizeModules(form.modules)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(templates.value))
   userStore.refreshPermissions()
   ElMessage.success('保存成功')

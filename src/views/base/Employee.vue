@@ -37,16 +37,25 @@ const rules = {
   positionId: [{ required: true, message: '请选择职位', trigger: 'change' }]
 }
 
-const visibleEmployees = computed(() => {
-  if (userStore.canAccessAllDepartments) return employees.value
-  if (userStore.isDepartmentManager) {
-    return employees.value.filter(emp => emp.deptId === userStore.deptId)
+const employeeScope = computed(() => userStore.getModuleScope('base:employee'))
+const departmentScope = computed(() => userStore.getModuleScope('base:department'))
+
+const filterEmployeesByScope = (list, scopeValue) => {
+  if (scopeValue === 'company') return list
+  if (scopeValue === 'dept') return list.filter(item => item.deptId === userStore.deptId)
+  if (scopeValue === 'self') return list.filter(item => item.empId === userStore.empId)
+  return list
+}
+
+const filterDepartmentsByScope = (list, scopeValue) => {
+  if (scopeValue === 'company') return list
+  if (scopeValue === 'dept' || scopeValue === 'self') {
+    return list.filter(item => item.deptId === userStore.deptId)
   }
-  if (userStore.isEmployee) {
-    return employees.value.filter(emp => emp.empId === userStore.empId)
-  }
-  return employees.value
-})
+  return list
+}
+
+const visibleEmployees = computed(() => filterEmployeesByScope(employees.value, employeeScope.value))
 
 const filteredEmployees = computed(() => {
   return visibleEmployees.value.filter(emp => {
@@ -66,10 +75,7 @@ const canDeleteEmployee = computed(() => userStore.hasPermission('base:employee:
 const getDeptName = (deptId) => departments.find(d => d.deptId === deptId)?.deptName || '-'
 const getPositionName = (positionId) => positions.find(p => p.positionId === positionId)?.positionName || '-'
 
-const visibleDepartments = computed(() => {
-  if (userStore.canAccessAllDepartments) return departments
-  return departments.filter(d => d.deptId === userStore.deptId)
-})
+const visibleDepartments = computed(() => filterDepartmentsByScope(departments, departmentScope.value))
 
 const filteredPositions = computed(() => {
   if (!form.deptId) return positions

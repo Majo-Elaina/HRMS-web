@@ -115,10 +115,13 @@ const permissionTree = ref([
           { id: 143, label: '删除角色', code: 'permission:role:delete' },
           { id: 144, label: '权限配置', code: 'permission:role:perm' }
         ]
-      }
+      },
+      { id: 16, label: '部门权限', code: 'permission:dept-template:view', children: [] },
+      { id: 17, label: '身份标签', code: 'permission:identity:view', children: [] },
+      { id: 18, label: '模块范围', code: 'permission:module-scope:view', children: [] },
+      { id: 19, label: '审批规则', code: 'permission:approval-rule:view', children: [] }
     ]
   },
-  { id: 16, label: '部门权限', code: 'permission:dept-template:view', children: [] },
   { id: 15, label: '数据报表', code: 'report:view', children: [] }
 ])
 
@@ -154,7 +157,7 @@ const getDefaultPermissionsByRole = (roleCode) => {
       'salary:config', 'salary:config:view', 'salary:config:add', 'salary:config:edit', 'salary:config:submit', 'salary:config:approve',
       'permission', 'permission:user', 'permission:user:view', 'permission:user:add', 'permission:user:edit', 'permission:user:delete',
       'permission:role', 'permission:role:view', 'permission:role:add', 'permission:role:edit', 'permission:role:delete', 'permission:role:perm',
-      'permission:dept-template:view',
+      'permission:dept-template:view', 'permission:identity:view', 'permission:module-scope:view', 'permission:approval-rule:view',
       'report:view'
     ]
   }

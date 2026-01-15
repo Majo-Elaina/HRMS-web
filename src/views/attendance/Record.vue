@@ -34,24 +34,22 @@ const rules = {
 
 const statusOptions = ['正常', '迟到', '早退', '缺勤', '请假', '加班']
 
-const visibleEmployees = computed(() => {
-  if (userStore.canAccessAllDepartments) return employees
-  if (userStore.isDepartmentManager) {
-    return employees.filter(emp => emp.deptId === userStore.deptId)
-  }
-  if (userStore.isEmployee) {
-    return employees.filter(emp => emp.empId === userStore.empId)
-  }
-  return employees
-})
+const recordScope = computed(() => userStore.getModuleScope('attendance:record'))
+
+const filterEmployeesByScope = (list, scopeValue) => {
+  if (scopeValue === 'company') return list
+  if (scopeValue === 'dept') return list.filter(emp => emp.deptId === userStore.deptId)
+  if (scopeValue === 'self') return list.filter(emp => emp.empId === userStore.empId)
+  return list
+}
+
+const visibleEmployees = computed(() => filterEmployeesByScope(employees, recordScope.value))
 
 const filteredAttendances = computed(() => {
   return attendances.value.filter(att => {
     const attEmp = employees.find(e => e.empId === att.empId)
-    if (!userStore.canAccessAllDepartments) {
-      if (userStore.isDepartmentManager && attEmp?.deptId !== userStore.deptId) return false
-      if (userStore.isEmployee && att.empId !== userStore.empId) return false
-    }
+    if (recordScope.value === 'dept' && attEmp?.deptId !== userStore.deptId) return false
+    if (recordScope.value === 'self' && att.empId !== userStore.empId) return false
     const matchName = !searchForm.empName || att.empName.includes(searchForm.empName)
     const matchStatus = !searchForm.status || att.status === searchForm.status
     let matchDate = true

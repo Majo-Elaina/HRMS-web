@@ -21,8 +21,10 @@ const rules = {
   deptName: [{ required: true, message: '请输入部门名称', trigger: 'blur' }]
 }
 
+const departmentScope = computed(() => userStore.getModuleScope('base:department'))
+
 const visibleDepartments = computed(() => {
-  if (userStore.canAccessAllDepartments) return departments.value
+  if (departmentScope.value === 'company') return departments.value
   return departments.value.filter(d => d.deptId === userStore.deptId)
 })
 

@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
+const isFinanceSpecialist = computed(() => userStore.matchIdentityTag('FINANCE_SPECIALIST', userStore.identityTag))
 
 const STORAGE_KEY = 'salary_configs'
 const DEFAULT_CONFIGS = [
@@ -120,7 +121,7 @@ const handleSubmit = async () => {
   if (!formRef.value) return
   await formRef.value.validate((valid) => {
     if (valid) {
-      const resolvedStatus = userStore.isFinance
+      const resolvedStatus = isFinanceSpecialist.value
         ? '待提交'
         : (form.status || '已生效')
 

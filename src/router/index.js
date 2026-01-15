@@ -82,6 +82,24 @@ const router = createRouter({
           meta: { title: '部门权限', icon: 'Tickets', permission: 'permission:dept-template:view' }
         },
         {
+          path: 'permission/identity',
+          name: 'PermissionIdentity',
+          component: () => import('@/views/permission/Identity.vue'),
+          meta: { title: '身份标签', icon: 'UserFilled', permission: 'permission:identity:view' }
+        },
+        {
+          path: 'permission/module-scope',
+          name: 'PermissionModuleScope',
+          component: () => import('@/views/permission/ModuleScope.vue'),
+          meta: { title: '模块范围', icon: 'List', permission: 'permission:module-scope:view' }
+        },
+        {
+          path: 'permission/approval-rule',
+          name: 'PermissionApprovalRule',
+          component: () => import('@/views/permission/ApprovalRule.vue'),
+          meta: { title: '审批规则', icon: 'Document', permission: 'permission:approval-rule:view' }
+        },
+        {
           path: 'report',
           name: 'Report',
           component: () => import('@/views/Report.vue'),

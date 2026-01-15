@@ -1,11 +1,76 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { leaveRequests as mockLeaves, employees } from '@/mock'
-import { useUserStore } from '@/stores/user'
+import { leaveRequests as mockLeaves, employees, departments, positions } from '@/mock'
+import { useUserStore, IDENTITY_TAG_OPTIONS } from '@/stores/user'
 
 const userStore = useUserStore()
-const leaveRequests = ref([...mockLeaves])
+const tagLabelMap = IDENTITY_TAG_OPTIONS.reduce((acc, item) => {
+  acc[item.value] = item.label
+  return acc
+}, {})
+
+const getTagLabel = (tag) => tagLabelMap[tag] || ''
+
+const getDeptName = (deptId) => departments.find(d => d.deptId === deptId)?.deptName || '-'
+const getPositionName = (positionId) => positions.find(p => p.positionId === positionId)?.positionName || '-'
+
+const getEmployeeTag = (empId) => {
+  const emp = employees.find(item => item.empId === empId)
+  const deptName = getDeptName(emp?.deptId)
+  const positionName = getPositionName(emp?.positionId)
+  const roleCode = positionName.includes('经理') ? 'MANAGER' : 'EMPLOYEE'
+  return userStore.getIdentityTagByEmpId(empId, { roleCode, deptName, positionName })
+}
+
+const matchDays = (rule, days) => {
+  if (rule.daysOp === 'any') return true
+  if (rule.daysOp === '<=') return days <= rule.daysValue
+  if (rule.daysOp === '>') return days > rule.daysValue
+  return false
+}
+
+const matchRule = (rule, applicantTag, days) => {
+  if (!userStore.matchIdentityTag(rule.applicantTag, applicantTag)) return false
+  return matchDays(rule, days)
+}
+
+const getMatchedRule = (empId, days) => {
+  const applicantTag = getEmployeeTag(empId)
+  const rules = userStore.getLeaveApprovalRules()
+  const exact = rules.find(rule => rule.applicantTag === applicantTag && matchDays(rule, days))
+  return exact || rules.find(rule => matchRule(rule, applicantTag, days))
+}
+
+const normalizeLeave = (leave) => {
+  const rule = getMatchedRule(leave.empId, leave.days)
+  const normalized = { ...leave }
+  const legacyStatusMap = {
+    'HR已批': '已通过',
+    '部门经理已批': '已通过',
+    '待经理审批': '待二级审批'
+  }
+  normalized.status = legacyStatusMap[normalized.status] || normalized.status
+  if (normalized.status === '待审批') {
+    normalized.pendingApproverTag = rule?.firstApproverTag || 'ADMIN'
+    normalized.pendingApproverScope = 'company'
+    normalized.nextApproverTag = rule?.secondApproverTag || ''
+    normalized.nextApproverScope = rule?.secondApproverScope || 'dept'
+  } else if (normalized.status === '待二级审批') {
+    normalized.pendingApproverTag = rule?.secondApproverTag || ''
+    normalized.pendingApproverScope = rule?.secondApproverScope || 'dept'
+    normalized.nextApproverTag = ''
+    normalized.nextApproverScope = rule?.secondApproverScope || 'dept'
+  } else {
+    normalized.pendingApproverTag = ''
+    normalized.pendingApproverScope = 'company'
+    normalized.nextApproverTag = rule?.secondApproverTag || ''
+    normalized.nextApproverScope = rule?.secondApproverScope || 'dept'
+  }
+  return normalized
+}
+
+const leaveRequests = ref(mockLeaves.map(item => normalizeLeave(item)))
 const dialogVisible = ref(false)
 const approveDialogVisible = ref(false)
 const formRef = ref(null)
@@ -42,26 +107,24 @@ const rules = {
 }
 
 const leaveTypes = ['年假', '病假', '事假', '婚假', '产假', '陪产假', '丧假']
-const statusOptions = ['待审批', '待经理审批', '部门经理已批', 'HR已批', '已拒绝', '已取消']
+const statusOptions = ['待审批', '待二级审批', '已通过', '已拒绝', '已取消']
 
-const visibleEmployees = computed(() => {
-  if (userStore.canAccessAllDepartments) return employees
-  if (userStore.isDepartmentManager) {
-    return employees.filter(emp => emp.deptId === userStore.deptId)
-  }
-  if (userStore.isEmployee) {
-    return employees.filter(emp => emp.empId === userStore.empId)
-  }
-  return employees
-})
+const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
+
+const filterByScope = (list, scopeValue) => {
+  if (scopeValue === 'company') return list
+  if (scopeValue === 'dept') return list.filter(emp => emp.deptId === userStore.deptId)
+  if (scopeValue === 'self') return list.filter(emp => emp.empId === userStore.empId)
+  return list
+}
+
+const visibleEmployees = computed(() => filterByScope(employees, leaveScope.value))
 
 const filteredLeaves = computed(() => {
   return leaveRequests.value.filter(leave => {
     const emp = employees.find(e => e.empId === leave.empId)
-    if (!userStore.canAccessAllDepartments) {
-      if (userStore.isDepartmentManager && emp?.deptId !== userStore.deptId) return false
-      if (userStore.isEmployee && leave.empId !== userStore.empId) return false
-    }
+    if (leaveScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
+    if (leaveScope.value === 'self' && leave.empId !== userStore.empId) return false
     const matchName = !searchForm.empName || leave.empName.includes(searchForm.empName)
     const matchType = !searchForm.leaveType || leave.leaveType === searchForm.leaveType
     const matchStatus = !searchForm.status || leave.status === searchForm.status
@@ -72,36 +135,54 @@ const filteredLeaves = computed(() => {
 const getStatusType = (status) => {
   const types = {
     '待审批': 'warning',
-    '待经理审批': 'warning',
-    '部门经理已批': 'primary',
-    'HR已批': 'success',
+    '待二级审批': 'warning',
+    '已通过': 'success',
     '已拒绝': 'danger',
     '已取消': 'info'
   }
   return types[status] || 'info'
 }
 
+const getStatusLabel = (row) => {
+  if (row.status === '待审批' || row.status === '待二级审批') {
+    const tagLabel = getTagLabel(row.pendingApproverTag)
+    return tagLabel ? `待${tagLabel}审批` : row.status
+  }
+  return row.status
+}
+
 const canApprove = (row) => {
   if (!userStore.hasPermission('attendance:leave:approve')) return false
-  const roleCode = userStore.roleCode
-  if (roleCode === 'ADMIN') return row.status === '待审批' || row.status === '待经理审批'
-  if (roleCode === 'HR') return row.status === '待审批'
-  if (roleCode === 'MANAGER' || roleCode === 'HR_MANAGER' || roleCode === 'FINANCE_MANAGER') {
+  if (!row.pendingApproverTag) return false
+  if (!userStore.matchIdentityTag(row.pendingApproverTag, userStore.identityTag)) return false
+  if (row.pendingApproverScope === 'dept') {
     const emp = employees.find(e => e.empId === row.empId)
-    return row.status === '待经理审批' && emp?.deptId === userStore.deptId
+    return emp?.deptId === userStore.deptId
   }
-  return false
+  if (row.pendingApproverScope === 'self') {
+    return row.empId === userStore.empId
+  }
+  return true
 }
 
 const canCancel = (row) => {
   if (!userStore.hasPermission('attendance:leave:cancel')) return false
-  if (userStore.isAdmin || userStore.isHr) return row.status === '待审批'
-  if (userStore.isEmployee) return row.status === '待审批' && row.empId === userStore.empId
-  if (userStore.isDepartmentManager) return row.status === '待审批' && row.empId === userStore.empId
-  return false
+  return row.empId === userStore.empId && (row.status === '待审批' || row.status === '待二级审批')
 }
 
 const canAddLeave = computed(() => userStore.hasPermission('attendance:leave:add'))
+
+const buildLeaveWithRule = (payload) => {
+  const rule = getMatchedRule(payload.empId, payload.days)
+  return {
+    ...payload,
+    status: '待审批',
+    pendingApproverTag: rule?.firstApproverTag || 'ADMIN',
+    pendingApproverScope: 'company',
+    nextApproverTag: rule?.secondApproverTag || '',
+    nextApproverScope: rule?.secondApproverScope || 'dept'
+  }
+}
 
 const handleAdd = () => {
   Object.assign(form, { leaveId: null, empId: '', leaveType: '年假', startDate: '', endDate: '', days: 1, reason: '' })
@@ -114,13 +195,13 @@ const handleSubmit = async () => {
     if (valid) {
       const emp = employees.find(e => e.empId === form.empId)
       const newId = Math.max(...leaveRequests.value.map(l => l.leaveId)) + 1
-      leaveRequests.value.push({
+      const payload = buildLeaveWithRule({
         ...form,
         leaveId: newId,
         empName: emp?.empName,
-        status: '待审批',
         applyTime: new Date().toLocaleString()
       })
+      leaveRequests.value.push(payload)
       ElMessage.success('申请提交成功')
       dialogVisible.value = false
     }
@@ -138,25 +219,27 @@ const submitApprove = () => {
   if (!row) return
 
   if (approveForm.action === 'approve') {
-    const roleCode = userStore.roleCode
     if (row.status === '待审批') {
-      if (roleCode === 'HR' || roleCode === 'ADMIN') {
-        row.status = row.days <= 3 ? 'HR已批' : '待经理审批'
+      if (row.nextApproverTag) {
+        row.status = '待二级审批'
+        row.pendingApproverTag = row.nextApproverTag
+        row.pendingApproverScope = row.nextApproverScope || 'dept'
+        row.nextApproverTag = ''
       } else {
-        ElMessage.warning('该申请需HR先审批')
-        return
+        row.status = '已通过'
+        row.pendingApproverTag = ''
+        row.pendingApproverScope = 'company'
       }
-    } else if (row.status === '待经理审批') {
-      if (roleCode === 'MANAGER' || roleCode === 'HR_MANAGER' || roleCode === 'ADMIN' || roleCode === 'FINANCE_MANAGER') {
-        row.status = '部门经理已批'
-      } else {
-        ElMessage.warning('该申请需部门经理或HR经理审批')
-        return
-      }
+    } else if (row.status === '待二级审批') {
+      row.status = '已通过'
+      row.pendingApproverTag = ''
+      row.pendingApproverScope = 'company'
     }
     ElMessage.success('审批通过')
   } else {
     row.status = '已拒绝'
+    row.pendingApproverTag = ''
+    row.pendingApproverScope = 'company'
     ElMessage.success('已拒绝')
   }
   row.approveRemark = approveForm.remark
@@ -222,7 +305,7 @@ const handleReset = () => {
         <el-table-column prop="reason" label="请假原因" min-width="150" show-overflow-tooltip />
         <el-table-column prop="status" label="状态" width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
+            <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="applyTime" label="申请时间" width="160" />
