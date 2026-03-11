@@ -1,26 +1,30 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useUserStore, IDENTITY_TAG_OPTIONS, MODULE_SCOPE_OPTIONS } from '@/stores/user'
+import { listIdentityTagsApi } from '@/api/identityTag'
+import { createApprovalRuleApi, deleteApprovalRuleApi, listApprovalRulesApi, updateApprovalRuleApi } from '@/api/approvalRule'
+import { createApprovalRuleTypeApi, listApprovalRuleTypesApi } from '@/api/approvalRuleType'
+import { MODULE_SCOPE_OPTIONS } from '@/stores/user'
 
-const userStore = useUserStore()
-const tagOptions = IDENTITY_TAG_OPTIONS
-const scopeOptions = MODULE_SCOPE_OPTIONS
-
-const ruleTypes = ref([...userStore.getApprovalRuleTypes()])
-const selectedType = ref(ruleTypes.value[0]?.type || 'leave')
-const rulesMap = ref(userStore.getApprovalRules())
+const loading = ref(false)
+const saving = ref(false)
+const tagOptions = ref([])
+const ruleTypes = ref([])
+const selectedType = ref('leave')
+const rulesMap = ref({})
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增规则')
 const typeDialogVisible = ref(false)
 const typeDialogTitle = ref('新增规则类型')
+
+const scopeOptions = MODULE_SCOPE_OPTIONS
 
 const form = reactive({
   id: null,
   applicantTag: '*',
   daysOp: '<=',
   daysValue: 3,
-  firstApproverTag: 'HR_SPECIALIST',
+  firstApproverTag: '',
   secondApproverTag: '',
   secondApproverScope: 'dept'
 })
@@ -33,7 +37,7 @@ const typeForm = reactive({
 
 const applicantOptions = computed(() => [
   { value: '*', label: '任意' },
-  ...tagOptions
+  ...tagOptions.value.map((item) => ({ value: item.tagCode, label: item.tagName }))
 ])
 
 const isLeaveType = computed(() => selectedType.value === 'leave')
@@ -45,8 +49,8 @@ const daysOptions = [
 ]
 
 const getTagLabel = (value) => {
-  const found = tagOptions.find(item => item.value === value)
-  return found ? found.label : value || '-'
+  const found = tagOptions.value.find((item) => item.tagCode === value)
+  return found ? found.tagName : value || '-'
 }
 
 const getDaysText = (row) => {
@@ -55,11 +59,6 @@ const getDaysText = (row) => {
 }
 
 const currentRules = computed(() => rulesMap.value[selectedType.value] || [])
-
-const getTypeName = (type) => {
-  const found = ruleTypes.value.find(item => item.type === type)
-  return found ? found.name : type
-}
 
 const getDefaultRuleForType = (type) => {
   if (type === 'leave') {
@@ -72,6 +71,7 @@ const getDefaultRuleForType = (type) => {
       secondApproverScope: 'dept'
     }
   }
+
   return {
     applicantTag: 'FINANCE_SPECIALIST',
     daysOp: 'any',
@@ -82,13 +82,67 @@ const getDefaultRuleForType = (type) => {
   }
 }
 
-const persistRules = () => {
-  userStore.saveApprovalRules(rulesMap.value)
+const normalizeRule = (rule) => ({
+  id: rule.ruleId,
+  applicantTag: rule.applicantTag,
+  daysOp: rule.daysOp || 'any',
+  daysValue: Number(rule.daysValue || 0),
+  firstApproverTag: rule.firstApproverTag,
+  secondApproverTag: rule.secondApproverTag || '',
+  secondApproverScope: rule.secondApproverScope || 'dept',
+  sortOrder: rule.sortOrder || 0
+})
+
+const loadRuleTypes = async () => {
+  const items = await listApprovalRuleTypesApi()
+  ruleTypes.value = (items || []).map((item) => ({
+    type: item.typeCode,
+    name: item.typeName,
+    desc: item.typeDesc,
+    status: item.status
+  }))
+
+  if (!ruleTypes.value.some((item) => item.type === selectedType.value)) {
+    selectedType.value = ruleTypes.value[0]?.type || 'leave'
+  }
 }
 
-const persistTypes = () => {
-  userStore.saveApprovalRuleTypes(ruleTypes.value)
+const loadRulesByType = async (typeCode) => {
+  if (!typeCode) return
+  const page = await listApprovalRulesApi({ page: 1, size: 200, typeCode })
+  rulesMap.value[typeCode] = (page.items || [])
+    .map(normalizeRule)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.id - b.id)
 }
+
+const loadPageData = async () => {
+  loading.value = true
+  try {
+    const [identityTags] = await Promise.all([
+      listIdentityTagsApi(),
+      loadRuleTypes()
+    ])
+    tagOptions.value = identityTags || []
+    await loadRulesByType(selectedType.value)
+  } catch (error) {
+    ElMessage.error(error.message || '加载审批规则失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(selectedType, async (typeCode, previousType) => {
+  if (!typeCode || typeCode === previousType) return
+  if (rulesMap.value[typeCode]) return
+  loading.value = true
+  try {
+    await loadRulesByType(typeCode)
+  } catch (error) {
+    ElMessage.error(error.message || '加载审批规则失败')
+  } finally {
+    loading.value = false
+  }
+})
 
 const handleAdd = () => {
   dialogTitle.value = '新增规则'
@@ -103,49 +157,56 @@ const handleEdit = (row) => {
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm('确定要删除该规则吗？', '提示', {
+  ElMessageBox.confirm('确定删除该审批规则吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    rulesMap.value[selectedType.value] = currentRules.value.filter(item => item.id !== row.id)
-    persistRules()
-    if (selectedType.value === 'leave') {
-      userStore.saveLeaveApprovalRules(rulesMap.value[selectedType.value])
+  }).then(async () => {
+    try {
+      await deleteApprovalRuleApi(row.id)
+      await loadRulesByType(selectedType.value)
+      ElMessage.success('规则已删除')
+    } catch (error) {
+      ElMessage.error(error.message || '删除审批规则失败')
     }
-    ElMessage.success('已删除')
   }).catch(() => {})
 }
 
-const handleSave = () => {
+const buildRulePayload = () => ({
+  typeCode: selectedType.value,
+  applicantTag: form.applicantTag,
+  daysOp: isLeaveType.value ? form.daysOp : 'any',
+  daysValue: isLeaveType.value && form.daysOp !== 'any' ? Number(form.daysValue || 0) : 0,
+  firstApproverTag: form.firstApproverTag,
+  secondApproverTag: form.secondApproverTag || null,
+  secondApproverScope: form.secondApproverTag ? form.secondApproverScope : null,
+  sortOrder: form.id
+    ? currentRules.value.find((item) => item.id === form.id)?.sortOrder || 0
+    : currentRules.value.length + 1
+})
+
+const handleSave = async () => {
   if (!form.firstApproverTag) {
     ElMessage.warning('请选择一级审批人')
     return
   }
-  const payload = { ...form }
-  if (!isLeaveType.value) {
-    payload.daysOp = 'any'
-    payload.daysValue = 0
-  } else if (payload.daysOp === 'any') {
-    payload.daysValue = 0
-  }
 
-  if (payload.id) {
-    const index = currentRules.value.findIndex(item => item.id === payload.id)
-    if (index > -1) {
-      rulesMap.value[selectedType.value].splice(index, 1, payload)
+  saving.value = true
+  try {
+    const payload = buildRulePayload()
+    if (form.id) {
+      await updateApprovalRuleApi(form.id, payload)
+    } else {
+      await createApprovalRuleApi(payload)
     }
-  } else {
-    const newId = currentRules.value.length ? Math.max(...currentRules.value.map(r => r.id)) + 1 : 1
-    if (!rulesMap.value[selectedType.value]) rulesMap.value[selectedType.value] = []
-    rulesMap.value[selectedType.value].push({ ...payload, id: newId })
+    await loadRulesByType(selectedType.value)
+    dialogVisible.value = false
+    ElMessage.success('审批规则已保存')
+  } catch (error) {
+    ElMessage.error(error.message || '保存审批规则失败')
+  } finally {
+    saving.value = false
   }
-  persistRules()
-  if (selectedType.value === 'leave') {
-    userStore.saveLeaveApprovalRules(rulesMap.value[selectedType.value])
-  }
-  ElMessage.success('规则已保存')
-  dialogVisible.value = false
 }
 
 const handleAddType = () => {
@@ -154,32 +215,48 @@ const handleAddType = () => {
   typeDialogVisible.value = true
 }
 
-const handleSaveType = () => {
+const handleSaveType = async () => {
   const type = typeForm.type.trim()
   const name = typeForm.name.trim()
+
   if (!type || !name) {
     ElMessage.warning('请填写类型编码和名称')
     return
   }
   if (!/^[a-z][a-z0-9_]*$/.test(type)) {
-    ElMessage.warning('类型编码需为小写字母开头，可包含数字和下划线')
+    ElMessage.warning('类型编码需以小写字母开头，可包含数字和下划线')
     return
   }
-  if (ruleTypes.value.some(item => item.type === type)) {
+  if (ruleTypes.value.some((item) => item.type === type)) {
     ElMessage.warning('类型编码已存在')
     return
   }
-  ruleTypes.value.push({ type, name, desc: typeForm.desc.trim() })
-  rulesMap.value[type] = []
-  persistTypes()
-  persistRules()
-  selectedType.value = type
-  typeDialogVisible.value = false
+
+  saving.value = true
+  try {
+    await createApprovalRuleTypeApi({
+      typeCode: type,
+      typeName: name,
+      typeDesc: typeForm.desc.trim(),
+      status: '启用'
+    })
+    await loadRuleTypes()
+    rulesMap.value[type] = []
+    selectedType.value = type
+    typeDialogVisible.value = false
+    ElMessage.success('规则类型已保存')
+  } catch (error) {
+    ElMessage.error(error.message || '保存规则类型失败')
+  } finally {
+    saving.value = false
+  }
 }
+
+loadPageData()
 </script>
 
 <template>
-  <div class="approval-rule-page">
+  <div class="approval-rule-page" v-loading="loading || saving">
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
@@ -189,11 +266,18 @@ const handleSaveType = () => {
             </el-select>
           </div>
           <div class="header-actions">
-            <el-button type="info" @click="handleAddType"><el-icon><Plus /></el-icon>新增类型</el-button>
-            <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新增规则</el-button>
+            <el-button type="info" @click="handleAddType">
+              <el-icon><Plus /></el-icon>
+              新增类型
+            </el-button>
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              新增规则
+            </el-button>
           </div>
         </div>
       </template>
+
       <el-table :data="currentRules" stripe border>
         <el-table-column label="申请人标签" width="150">
           <template #default="{ row }">
@@ -206,10 +290,10 @@ const handleSaveType = () => {
         <el-table-column label="一级审批人" width="150">
           <template #default="{ row }">{{ getTagLabel(row.firstApproverTag) }}</template>
         </el-table-column>
-        <el-table-column label="二级审批人" min-width="180">
+        <el-table-column label="二级审批人" min-width="200">
           <template #default="{ row }">
             <span v-if="row.secondApproverTag">
-              {{ getTagLabel(row.secondApproverTag) }}（{{ scopeOptions.find(s => s.value === row.secondApproverScope)?.label || '本部门' }}）
+              {{ getTagLabel(row.secondApproverTag) }}（{{ scopeOptions.find((item) => item.value === row.secondApproverScope)?.label || '本部门' }}）
             </span>
             <span v-else>-</span>
           </template>
@@ -227,28 +311,38 @@ const handleSaveType = () => {
       <el-form :model="form" label-width="100px">
         <el-form-item label="申请人标签">
           <el-select v-model="form.applicantTag" style="width: 220px">
-            <el-option v-for="opt in applicantOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            <el-option v-for="option in applicantOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
         </el-form-item>
         <el-form-item v-if="isLeaveType" label="请假天数">
           <el-select v-model="form.daysOp" style="width: 140px">
-            <el-option v-for="opt in daysOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            <el-option v-for="option in daysOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
           <el-input-number v-if="form.daysOp !== 'any'" v-model="form.daysValue" :min="0.5" :step="0.5" style="margin-left: 10px" />
         </el-form-item>
         <el-form-item label="一级审批人">
           <el-select v-model="form.firstApproverTag" style="width: 220px">
-            <el-option v-for="opt in tagOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            <el-option
+              v-for="option in tagOptions"
+              :key="option.tagCode"
+              :label="option.tagName"
+              :value="option.tagCode"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="二级审批人">
           <el-select v-model="form.secondApproverTag" placeholder="可选" style="width: 220px" clearable>
-            <el-option v-for="opt in tagOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            <el-option
+              v-for="option in tagOptions"
+              :key="option.tagCode"
+              :label="option.tagName"
+              :value="option.tagCode"
+            />
           </el-select>
         </el-form-item>
         <el-form-item v-if="form.secondApproverTag" label="范围">
           <el-select v-model="form.secondApproverScope" style="width: 220px">
-            <el-option v-for="opt in scopeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            <el-option v-for="option in scopeOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -284,25 +378,31 @@ const handleSaveType = () => {
   justify-content: space-between;
   align-items: center;
 }
+
 .title-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
 }
+
 .type-select {
   width: 220px;
 }
+
 .type-select :deep(.el-input__wrapper) {
   border-radius: 999px;
   background: #f5f7fa;
 }
+
 .type-select :deep(.el-input__inner) {
   font-weight: 600;
   color: #303133;
 }
+
 .type-select :deep(.el-input__suffix-inner) {
   color: #606266;
 }
+
 .header-actions {
   display: flex;
   gap: 10px;

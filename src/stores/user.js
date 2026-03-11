@@ -1,6 +1,9 @@
-import { defineStore } from 'pinia'
+﻿import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { currentUser, users, employees, roles, departments, positions } from '@/mock'
+import { getProfileApi, loginApi } from '@/api/auth'
+import { listModuleScopeConfigsApi } from '@/api/moduleScope'
+import { listApprovalRuleTypesApi } from '@/api/approvalRuleType'
+import { listApprovalRulesApi } from '@/api/approvalRule'
 
 const ALL_PERMISSIONS = [
   'dashboard', 'dashboard:view',
@@ -83,44 +86,21 @@ const ROLE_PERMISSIONS = {
   ]
 }
 
-const ACCOUNT_PASSWORDS = {
-  admin: 'admin123',
-  hr_lina: '123456',
-  hr_manager: '123456',
-  manager_zhao: '123456',
-  emp_zhou: '123456',
-  finance_liu: '123456',
-  finance_chen: '123456'
-}
-
 export const IDENTITY_TAG_OPTIONS = [
-  { value: 'ADMIN', label: '管理员' },
-  { value: 'HR_MANAGER', label: 'HR经理' },
-  { value: 'HR_SPECIALIST', label: 'HR专员' },
-  { value: 'FINANCE_MANAGER', label: '财务经理' },
-  { value: 'FINANCE_SPECIALIST', label: '财务专员' },
-  { value: 'MANAGER', label: '部门经理' },
-  { value: 'EMPLOYEE', label: '普通员工' }
+  { value: 'ADMIN', label: 'Admin' },
+  { value: 'HR_MANAGER', label: 'HR Manager' },
+  { value: 'HR_SPECIALIST', label: 'HR Specialist' },
+  { value: 'FINANCE_MANAGER', label: 'Finance Manager' },
+  { value: 'FINANCE_SPECIALIST', label: 'Finance Specialist' },
+  { value: 'MANAGER', label: 'Manager' },
+  { value: 'EMPLOYEE', label: 'Employee' }
 ]
 
 export const MODULE_SCOPE_OPTIONS = [
-  { value: 'self', label: '仅本人' },
-  { value: 'dept', label: '本部门' },
-  { value: 'company', label: '全公司' }
+  { value: 'self', label: 'Self' },
+  { value: 'dept', label: 'Department' },
+  { value: 'company', label: 'Company' }
 ]
-
-const DEPT_TEMPLATE_KEY = 'dept_permissions'
-const DEFAULT_DEPT_TEMPLATES = {
-  '人力资源部': ['dashboard', 'base', 'attendance', 'report'],
-  '财务部': ['dashboard', 'salary', 'report'],
-  '_default': ['dashboard', 'attendance', 'base']
-}
-
-const IDENTITY_TAG_STORAGE_KEY = 'user_identity_tags'
-const MODULE_SCOPE_STORAGE_KEY = 'module_data_scopes'
-const LEAVE_APPROVAL_RULES_KEY = 'leave_approval_rules'
-const APPROVAL_RULES_KEY = 'approval_rules'
-const APPROVAL_RULE_TYPES_KEY = 'approval_rule_types'
 
 const DEFAULT_MODULE_SCOPES = {
   'base:employee': {
@@ -216,8 +196,8 @@ const DEFAULT_LEAVE_APPROVAL_RULES = [
     daysOp: '<=',
     daysValue: 3,
     firstApproverTag: 'HR_SPECIALIST',
-    secondApproverTag: '',
-    secondApproverScope: 'dept'
+    secondApproverTag: 'HR_MANAGER',
+    secondApproverScope: 'company'
   },
   {
     id: 2,
@@ -225,8 +205,8 @@ const DEFAULT_LEAVE_APPROVAL_RULES = [
     daysOp: '>',
     daysValue: 3,
     firstApproverTag: 'HR_SPECIALIST',
-    secondApproverTag: 'MANAGER',
-    secondApproverScope: 'dept'
+    secondApproverTag: 'HR_MANAGER',
+    secondApproverScope: 'company'
   },
   {
     id: 3,
@@ -234,8 +214,8 @@ const DEFAULT_LEAVE_APPROVAL_RULES = [
     daysOp: 'any',
     daysValue: 0,
     firstApproverTag: 'HR_MANAGER',
-    secondApproverTag: '',
-    secondApproverScope: 'dept'
+    secondApproverTag: 'ADMIN',
+    secondApproverScope: 'company'
   },
   {
     id: 4,
@@ -244,16 +224,15 @@ const DEFAULT_LEAVE_APPROVAL_RULES = [
     daysValue: 0,
     firstApproverTag: 'ADMIN',
     secondApproverTag: '',
-    secondApproverScope: 'dept'
+    secondApproverScope: 'company'
   }
 ]
 
 const DEFAULT_APPROVAL_RULE_TYPES = [
-  { type: 'leave', name: '请假审批规则', desc: '请假申请的审批流程' },
-  { type: 'salary_record', name: '薪资记录审批规则', desc: '薪资记录提交与审批流程' },
-  { type: 'salary_config', name: '薪资配置审批规则', desc: '薪资配置提交与审批流程' }
+  { type: 'leave', name: 'Leave Approval', desc: 'Approval flow for leave requests' },
+  { type: 'salary_record', name: 'Salary Record Approval', desc: 'Approval flow for salary record submissions' },
+  { type: 'salary_config', name: 'Salary Config Approval', desc: 'Approval flow for salary configuration submissions' }
 ]
-
 const DEFAULT_APPROVAL_RULES = {
   leave: [...DEFAULT_LEAVE_APPROVAL_RULES],
   salary_record: [
@@ -280,46 +259,6 @@ const DEFAULT_APPROVAL_RULES = {
   ]
 }
 
-const loadDeptTemplates = () => {
-  const stored = localStorage.getItem(DEPT_TEMPLATE_KEY)
-  if (!stored) return { ...DEFAULT_DEPT_TEMPLATES }
-  try {
-    const parsed = JSON.parse(stored)
-    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_DEPT_TEMPLATES }
-    const normalized = {}
-    Object.keys(parsed).forEach(key => {
-      normalized[key] = (parsed[key] || []).map(item => {
-        if (item === 'salary:record' || item === 'salary:config') return 'salary'
-        return item
-      })
-    })
-    return { ...DEFAULT_DEPT_TEMPLATES, ...normalized }
-  } catch {
-    return { ...DEFAULT_DEPT_TEMPLATES }
-  }
-}
-
-const getDeptPermissionPrefixes = (deptName) => {
-  const templates = loadDeptTemplates()
-  return templates[deptName] || templates._default || DEFAULT_DEPT_TEMPLATES._default
-}
-
-const filterPermissionsByDept = (rolePerms, deptPrefixes) => {
-  if (!deptPrefixes?.length) return rolePerms
-  return rolePerms.filter(perm => deptPrefixes.some(prefix => perm === prefix || perm.startsWith(prefix + ':')))
-}
-
-const loadIdentityTags = () => {
-  const stored = localStorage.getItem(IDENTITY_TAG_STORAGE_KEY)
-  if (!stored) return {}
-  try {
-    const parsed = JSON.parse(stored)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
 const resolveIdentityTag = ({ roleCode, deptName, positionName }) => {
   if (roleCode === 'ADMIN') return 'ADMIN'
   if (deptName === '人力资源部') {
@@ -331,7 +270,6 @@ const resolveIdentityTag = ({ roleCode, deptName, positionName }) => {
   if (roleCode === 'MANAGER') return 'MANAGER'
   return 'EMPLOYEE'
 }
-
 const getIdentityTagAliases = (tag) => {
   const aliasMap = {
     ADMIN: ['ADMIN'],
@@ -351,8 +289,7 @@ const matchIdentityTag = (expectedTag, actualTag) => {
 }
 
 const getIdentityTagByEmpId = (empId, fallback) => {
-  const stored = loadIdentityTags()
-  if (stored && stored[empId]) return stored[empId]
+  if (fallback?.identityTag) return fallback.identityTag
   return resolveIdentityTag(fallback)
 }
 
@@ -372,15 +309,10 @@ const normalizeModuleScopes = (scopes) => {
   return normalized
 }
 
+let cachedModuleScopes = normalizeModuleScopes()
+
 const loadModuleScopes = () => {
-  const stored = localStorage.getItem(MODULE_SCOPE_STORAGE_KEY)
-  if (!stored) return normalizeModuleScopes()
-  try {
-    const parsed = JSON.parse(stored)
-    return normalizeModuleScopes(parsed && typeof parsed === 'object' ? parsed : {})
-  } catch {
-    return normalizeModuleScopes()
-  }
+  return cachedModuleScopes
 }
 
 const getModuleScopeByTag = (moduleCode, tag) => {
@@ -395,14 +327,7 @@ const getModuleScopeByTag = (moduleCode, tag) => {
 }
 
 const loadLeaveApprovalRules = () => {
-  const stored = localStorage.getItem(LEAVE_APPROVAL_RULES_KEY)
-  if (!stored) return [...DEFAULT_LEAVE_APPROVAL_RULES]
-  try {
-    const parsed = JSON.parse(stored)
-    return Array.isArray(parsed) ? parsed : [...DEFAULT_LEAVE_APPROVAL_RULES]
-  } catch {
-    return [...DEFAULT_LEAVE_APPROVAL_RULES]
-  }
+  return [...(cachedApprovalRules.leave || DEFAULT_LEAVE_APPROVAL_RULES)]
 }
 
 const normalizeApprovalRules = (rulesByType = {}) => {
@@ -424,72 +349,33 @@ const normalizeApprovalRules = (rulesByType = {}) => {
   return normalized
 }
 
+let cachedApprovalRuleTypes = [...DEFAULT_APPROVAL_RULE_TYPES]
+let cachedApprovalRules = normalizeApprovalRules({})
+
 const loadApprovalRuleTypes = () => {
-  const stored = localStorage.getItem(APPROVAL_RULE_TYPES_KEY)
-  if (!stored) return [...DEFAULT_APPROVAL_RULE_TYPES]
-  try {
-    const parsed = JSON.parse(stored)
-    return Array.isArray(parsed) ? parsed : [...DEFAULT_APPROVAL_RULE_TYPES]
-  } catch {
-    return [...DEFAULT_APPROVAL_RULE_TYPES]
-  }
+  return [...cachedApprovalRuleTypes]
 }
 
 const loadApprovalRules = () => {
-  const stored = localStorage.getItem(APPROVAL_RULES_KEY)
-  if (!stored) {
-    const legacyLeave = loadLeaveApprovalRules()
-    return normalizeApprovalRules({ leave: legacyLeave })
-  }
-  try {
-    const parsed = JSON.parse(stored)
-    return normalizeApprovalRules(parsed && typeof parsed === 'object' ? parsed : {})
-  } catch {
-    const legacyLeave = loadLeaveApprovalRules()
-    return normalizeApprovalRules({ leave: legacyLeave })
-  }
+  return normalizeApprovalRules(cachedApprovalRules)
 }
 
-const getRolePermissions = (roleCode, deptName) => {
+const getRolePermissions = (roleCode) => {
   if (roleCode === 'ADMIN') return [...ALL_PERMISSIONS]
-  const stored = JSON.parse(localStorage.getItem('role_permissions') || '{}')
-  const basePerms = stored[roleCode]?.length
-    ? [...stored[roleCode]]
-    : (ROLE_PERMISSIONS[roleCode] ? [...ROLE_PERMISSIONS[roleCode]] : [])
-  return filterPermissionsByDept(basePerms, getDeptPermissionPrefixes(deptName))
+  return ROLE_PERMISSIONS[roleCode] ? [...ROLE_PERMISSIONS[roleCode]] : []
 }
 
-const buildUserProfile = (baseUser) => {
-  const emp = employees.find(e => e.empId === baseUser.empId)
-  const role = roles.find(r => r.roleId === baseUser.roleId)
-  const dept = departments.find(d => d.deptId === emp?.deptId)
-  const position = positions.find(p => p.positionId === emp?.positionId)
-  const roleCode = role?.roleCode || baseUser.roleCode || ''
-  const roleName = role?.roleName || baseUser.roleName || ''
-  const identityTag = getIdentityTagByEmpId(emp?.empId ?? baseUser.empId, {
-    roleCode,
-    deptName: dept?.deptName ?? baseUser.deptName,
-    positionName: position?.positionName ?? baseUser.positionName
-  })
-
-  return {
-    ...baseUser,
-    empId: emp?.empId ?? baseUser.empId,
-    empName: emp?.empName ?? baseUser.empName,
-    deptId: emp?.deptId ?? baseUser.deptId,
-    deptName: dept?.deptName ?? baseUser.deptName,
-    positionId: emp?.positionId ?? baseUser.positionId,
-    positionName: position?.positionName ?? baseUser.positionName,
-    roleCode,
-    roleName,
-    identityTag,
-    permissions: getRolePermissions(roleCode, dept?.deptName)
-  }
-}
+const normalizeUserProfile = (profile = {}) => ({
+  ...profile,
+  permissions: Array.isArray(profile.permissions)
+    ? [...profile.permissions]
+    : getRolePermissions(profile.roleCode)
+})
 
 export const useUserStore = defineStore('user', () => {
   const user = ref(null)
   const token = ref(localStorage.getItem('token') || '')
+  const restored = ref(false)
 
   const isLoggedIn = computed(() => !!token.value)
   const permissions = computed(() => user.value?.permissions || [])
@@ -506,59 +392,152 @@ export const useUserStore = defineStore('user', () => {
   const hasIdentityTag = (tag) => matchIdentityTag(tag, identityTag.value)
   const getModuleScope = (moduleCode, tag = identityTag.value) => getModuleScopeByTag(moduleCode, tag)
 
-  // 登录
-  function login(username, password) {
-    const expectedPassword = ACCOUNT_PASSWORDS[username]
-    if (!expectedPassword || expectedPassword !== password) {
-      return { success: false, message: '用户名或密码错误' }
-    }
+  const hydrateRemoteConfigs = async () => {
+    try {
+      const [moduleConfigs, approvalRuleTypes] = await Promise.all([
+        listModuleScopeConfigsApi(),
+        listApprovalRuleTypesApi()
+      ])
 
-    const baseUser = username === 'admin'
-      ? currentUser
-      : users.find(u => u.username === username)
+      const nextModuleScopes = {}
+      ;(moduleConfigs || []).forEach((config) => {
+        nextModuleScopes[config.moduleCode] = {
+          default: config.defaultScope,
+          tagScopes: { ...(config.tagScopes || {}) }
+        }
+      })
+      cachedModuleScopes = normalizeModuleScopes(nextModuleScopes)
 
-    if (baseUser) {
-      const userData = buildUserProfile(baseUser)
-      user.value = userData
-      refreshPermissions()
-      token.value = 'mock_token_' + Date.now()
-      localStorage.setItem('token', token.value)
-      return { success: true }
+      const normalizedTypes = (approvalRuleTypes || []).map((item) => ({
+        type: item.typeCode,
+        name: item.typeName,
+        desc: item.typeDesc
+      }))
+      cachedApprovalRuleTypes = normalizedTypes.length
+        ? normalizedTypes
+        : [...DEFAULT_APPROVAL_RULE_TYPES]
+
+      const rulePages = await Promise.all(cachedApprovalRuleTypes.map(async (type) => {
+        try {
+          const page = await listApprovalRulesApi({ page: 1, size: 200, typeCode: type.type })
+          return [type.type, page.items || []]
+        } catch {
+          return [type.type, []]
+        }
+      }))
+
+      const nextRules = {}
+      rulePages.forEach(([typeCode, items]) => {
+        nextRules[typeCode] = items.map((item) => ({
+          id: item.ruleId,
+          applicantTag: item.applicantTag,
+          daysOp: item.daysOp,
+          daysValue: Number(item.daysValue || 0),
+          firstApproverTag: item.firstApproverTag,
+          secondApproverTag: item.secondApproverTag || '',
+          secondApproverScope: item.secondApproverScope || 'dept',
+          sortOrder: item.sortOrder || 0
+        }))
+      })
+      cachedApprovalRules = normalizeApprovalRules(nextRules)
+    } catch {
+      cachedModuleScopes = normalizeModuleScopes()
+      cachedApprovalRuleTypes = [...DEFAULT_APPROVAL_RULE_TYPES]
+      cachedApprovalRules = normalizeApprovalRules({})
     }
-    return { success: false, message: '用户名或密码错误' }
   }
 
-  // 登出
+  const persistUser = (profile) => {
+    user.value = {
+      ...normalizeUserProfile(profile),
+      identityTag: getIdentityTagByEmpId(profile.empId, {
+        identityTag: profile.identityTag,
+        roleCode: profile.roleCode,
+        deptName: profile.deptName,
+        positionName: profile.positionName
+      })
+    }
+    localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
+  async function loginByApi(username, password) {
+    try {
+      const result = await loginApi({ username, password })
+      persistUser(result.user)
+      await hydrateRemoteConfigs()
+      token.value = result.token
+      restored.value = true
+      localStorage.setItem('token', token.value)
+      return { success: true }
+    } catch (error) {
+      return { success: false, message: error.message || 'login failed' }
+    }
+  }
+
+  async function restoreLoginByApi(force = false) {
+    if (!token.value) {
+      restored.value = true
+      return
+    }
+    if (restored.value && !force) return
+
+    const savedUser = localStorage.getItem('user')
+    if (!savedUser) {
+      logout()
+      restored.value = true
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(savedUser)
+      if (!parsed?.userId) {
+        persistUser(parsed)
+      } else {
+        const profile = await getProfileApi(parsed.userId)
+        persistUser(profile)
+      }
+      await hydrateRemoteConfigs()
+    } catch {
+      logout()
+    } finally {
+      restored.value = true
+    }
+  }
+
+  async function refreshPermissionsByApi() {
+    if (!user.value) return
+    if (user.value.userId) {
+      try {
+        const profile = await getProfileApi(user.value.userId)
+        persistUser(profile)
+        await hydrateRemoteConfigs()
+        return
+      } catch {
+        // Fall back to the current in-memory profile when the profile API is unavailable.
+      }
+    }
+
+    user.value = {
+      ...normalizeUserProfile(user.value),
+      identityTag: getIdentityTagByEmpId(user.value.empId, {
+        identityTag: user.value.identityTag,
+        roleCode: user.value.roleCode,
+        deptName: user.value.deptName,
+        positionName: user.value.positionName
+      })
+    }
+    localStorage.setItem('user', JSON.stringify(user.value))
+  }
+
+  // 鐧诲嚭
   function logout() {
     user.value = null
     token.value = ''
+    cachedModuleScopes = normalizeModuleScopes()
+    cachedApprovalRuleTypes = [...DEFAULT_APPROVAL_RULE_TYPES]
+    cachedApprovalRules = normalizeApprovalRules({})
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-  }
-
-  // 恢复登录状态
-  function restoreLogin() {
-    const savedUser = localStorage.getItem('user')
-    if (savedUser && token.value) {
-      const parsed = JSON.parse(savedUser)
-      user.value = buildUserProfile(parsed)
-      localStorage.setItem('user', JSON.stringify(user.value))
-    }
-  }
-
-  function refreshPermissions() {
-    if (!user.value) return
-    const refreshedIdentityTag = getIdentityTagByEmpId(user.value.empId, {
-      roleCode: user.value.roleCode,
-      deptName: user.value.deptName,
-      positionName: user.value.positionName
-    })
-    user.value = {
-      ...user.value,
-      identityTag: refreshedIdentityTag,
-      permissions: getRolePermissions(user.value.roleCode, user.value.deptName)
-    }
-    localStorage.setItem('user', JSON.stringify(user.value))
   }
 
   // 检查权限
@@ -575,43 +554,6 @@ export const useUserStore = defineStore('user', () => {
     return false
   }
 
-  const getIdentityTags = () => loadIdentityTags()
-  const saveIdentityTags = (tags) => {
-    localStorage.setItem(IDENTITY_TAG_STORAGE_KEY, JSON.stringify(tags))
-    refreshPermissions()
-  }
-
-  const getModuleScopes = () => loadModuleScopes()
-  const saveModuleScopes = (scopes) => {
-    localStorage.setItem(MODULE_SCOPE_STORAGE_KEY, JSON.stringify(scopes))
-    refreshPermissions()
-  }
-
-  const getApprovalRuleTypes = () => loadApprovalRuleTypes()
-  const saveApprovalRuleTypes = (types) => {
-    localStorage.setItem(APPROVAL_RULE_TYPES_KEY, JSON.stringify(types))
-  }
-
-  const getApprovalRules = () => loadApprovalRules()
-  const getApprovalRulesByType = (type) => {
-    const rules = loadApprovalRules()
-    return rules[type] ? [...rules[type]] : []
-  }
-  const saveApprovalRules = (rulesByType) => {
-    localStorage.setItem(APPROVAL_RULES_KEY, JSON.stringify(rulesByType))
-  }
-  const saveApprovalRulesByType = (type, rules) => {
-    const stored = loadApprovalRules()
-    stored[type] = rules
-    saveApprovalRules(stored)
-    if (type === 'leave') {
-      localStorage.setItem(LEAVE_APPROVAL_RULES_KEY, JSON.stringify(rules))
-    }
-  }
-
-  const getLeaveApprovalRules = () => getApprovalRulesByType('leave')
-  const saveLeaveApprovalRules = (rules) => saveApprovalRulesByType('leave', rules)
-
   return {
     user,
     token,
@@ -625,27 +567,20 @@ export const useUserStore = defineStore('user', () => {
     positionName,
     isAdmin,
     identityTagAliases,
-    login,
+    login: loginByApi,
     logout,
-    restoreLogin,
-    refreshPermissions,
+    restoreLogin: restoreLoginByApi,
+    refreshPermissions: refreshPermissionsByApi,
     hasPermission,
     hasIdentityTag,
     getIdentityTagAliases,
     matchIdentityTag,
     getIdentityTagByEmpId,
     getModuleScope,
-    getIdentityTags,
-    saveIdentityTags,
-    getModuleScopes,
-    saveModuleScopes,
-    getApprovalRuleTypes,
-    saveApprovalRuleTypes,
-    getApprovalRules,
-    getApprovalRulesByType,
-    saveApprovalRules,
-    saveApprovalRulesByType,
-    getLeaveApprovalRules,
-    saveLeaveApprovalRules
-  }
+      }
 })
+
+
+
+
+

@@ -115,9 +115,9 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
-  userStore.restoreLogin()
+  await userStore.restoreLogin()
 
   if (to.meta.requiresAuth === false) {
     if (userStore.isLoggedIn && to.path === '/login') {
@@ -125,14 +125,12 @@ router.beforeEach((to, from, next) => {
     } else {
       next()
     }
+  } else if (!userStore.isLoggedIn) {
+    next('/login')
+  } else if (to.meta.permission && !userStore.hasPermission(to.meta.permission)) {
+    next('/dashboard')
   } else {
-    if (!userStore.isLoggedIn) {
-      next('/login')
-    } else if (to.meta.permission && !userStore.hasPermission(to.meta.permission)) {
-      next('/dashboard')
-    } else {
-      next()
-    }
+    next()
   }
 })
 

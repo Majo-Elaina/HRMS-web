@@ -35,5 +35,5 @@ coverage
 # Vitest
 __screenshots__/
 
-# ai
-/ai-docs/
+# docx
+*.docx

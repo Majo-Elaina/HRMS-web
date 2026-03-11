@@ -1,4 +1,4 @@
-// Mock数据
+// Mock 数据
 
 // 部门数据
 export const departments = [
@@ -8,7 +8,7 @@ export const departments = [
   { deptId: 4, deptName: '技术部', deptDesc: '负责技术研发', parentId: 1 },
   { deptId: 5, deptName: '市场部', deptDesc: '负责市场营销', parentId: 1 },
   { deptId: 6, deptName: '行政部', deptDesc: '负责行政事务', parentId: 1 },
-  { deptId: 7, deptName: '综合部', deptDesc: '负责综合事务如住宿、后勤等', parentId: 1 }
+  { deptId: 7, deptName: '综合部', deptDesc: '负责综合事务，如住宿、后勤等', parentId: 1 }
 ]
 
 // 职位数据
@@ -95,19 +95,6 @@ export const salaryRecords = [
   { salaryId: 4, empId: 6, empName: '赵明', salaryMonth: '2024-01', baseSalary: 20000, positionSalary: 5000, bonus: 2000, overtimePay: 1500, grossSalary: 28500, socialInsurance: 2100, housingFund: 1920, attendanceDeduct: 0, tax: 2095, otherDeduct: 0, netSalary: 22385, status: '已发放' },
   { salaryId: 5, empId: 8, empName: '周洋', salaryMonth: '2024-01', baseSalary: 8000, positionSalary: 1500, bonus: 500, overtimePay: 0, grossSalary: 10000, socialInsurance: 840, housingFund: 720, attendanceDeduct: 200, tax: 144, otherDeduct: 0, netSalary: 8096, status: '待发放' }
 ]
-
-// 当前登录用户
-export const currentUser = {
-  userId: 1,
-  username: 'admin',
-  empName: '张伟',
-  empId: 1,
-  roleId: 1,
-  roleName: '系统管理员',
-  roleCode: 'ADMIN',
-  avatar: '',
-  permissions: ['dashboard', 'base', 'base:employee', 'base:department', 'base:position', 'attendance', 'attendance:record', 'attendance:leave', 'salary', 'salary:record', 'salary:config', 'permission', 'permission:user', 'permission:role', 'report']
-}
 
 // 统计数据
 export const statistics = {

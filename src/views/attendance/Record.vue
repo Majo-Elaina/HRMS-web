@@ -1,17 +1,26 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { attendances as mockAttendances, employees } from '@/mock'
 import { useUserStore } from '@/stores/user'
+import { listEmployeesApi } from '@/api/employee'
+import { createAttendanceApi, listAttendanceApi, updateAttendanceApi } from '@/api/attendance'
+import {
+  ATTENDANCE_STATUS,
+  getAttendanceStatusType,
+  resolveAttendanceStatus,
+  splitAttendanceStatus
+} from '@/utils/smartRemark'
 
 const userStore = useUserStore()
-const attendances = ref([...mockAttendances])
+
+const loading = ref(false)
+const attendances = ref([])
+const employees = ref([])
 const dialogVisible = ref(false)
 const formRef = ref(null)
 
 const searchForm = reactive({
   empName: '',
-  deptId: '',
   status: '',
   dateRange: []
 })
@@ -22,124 +31,186 @@ const form = reactive({
   attendanceDate: '',
   clockIn: '',
   clockOut: '',
-  status: '正常',
+  status: ATTENDANCE_STATUS.normal,
   remark: ''
 })
 
 const rules = {
   empId: [{ required: true, message: '请选择员工', trigger: 'change' }],
-  attendanceDate: [{ required: true, message: '请选择考勤日期', trigger: 'change' }],
-  status: [{ required: true, message: '请选择考勤状态', trigger: 'change' }]
+  attendanceDate: [{ required: true, message: '请选择考勤日期', trigger: 'change' }]
 }
 
-const statusOptions = ['正常', '迟到', '早退', '缺勤', '请假', '加班']
-
+const statusOptions = Object.values(ATTENDANCE_STATUS)
 const recordScope = computed(() => userStore.getModuleScope('attendance:record'))
+const canAddAttendance = computed(() => userStore.hasPermission('attendance:record:add'))
+const canEditAttendance = computed(() => userStore.hasPermission('attendance:record:edit'))
 
 const filterEmployeesByScope = (list, scopeValue) => {
   if (scopeValue === 'company') return list
-  if (scopeValue === 'dept') return list.filter(emp => emp.deptId === userStore.deptId)
-  if (scopeValue === 'self') return list.filter(emp => emp.empId === userStore.empId)
+  if (scopeValue === 'dept') return list.filter(item => item.deptId === userStore.deptId)
+  if (scopeValue === 'self') return list.filter(item => item.empId === userStore.empId)
   return list
 }
 
-const visibleEmployees = computed(() => filterEmployeesByScope(employees, recordScope.value))
+const visibleEmployees = computed(() => filterEmployeesByScope(employees.value, recordScope.value))
+
+const employeeNameMap = computed(() => employees.value.reduce((acc, item) => {
+  acc[item.empId] = item.empName
+  return acc
+}, {}))
+
+const visibleAttendances = computed(() => {
+  if (recordScope.value === 'company') return attendances.value
+  if (recordScope.value === 'dept') {
+    const visibleIds = new Set(visibleEmployees.value.map(item => item.empId))
+    return attendances.value.filter(item => visibleIds.has(item.empId))
+  }
+  return attendances.value.filter(item => item.empId === userStore.empId)
+})
 
 const filteredAttendances = computed(() => {
-  return attendances.value.filter(att => {
-    const attEmp = employees.find(e => e.empId === att.empId)
-    if (recordScope.value === 'dept' && attEmp?.deptId !== userStore.deptId) return false
-    if (recordScope.value === 'self' && att.empId !== userStore.empId) return false
-    const matchName = !searchForm.empName || att.empName.includes(searchForm.empName)
-    const matchStatus = !searchForm.status || att.status === searchForm.status
+  return visibleAttendances.value.filter(item => {
+    const empName = employeeNameMap.value[item.empId] || ''
+    const matchName = !searchForm.empName || empName.includes(searchForm.empName.trim())
+    const matchStatus = !searchForm.status || splitAttendanceStatus(item.status).includes(searchForm.status)
     let matchDate = true
-    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
-      const attDate = new Date(att.attendanceDate)
-      matchDate = attDate >= new Date(searchForm.dateRange[0]) && attDate <= new Date(searchForm.dateRange[1])
+    if (searchForm.dateRange?.length === 2) {
+      matchDate = item.attendanceDate >= searchForm.dateRange[0] && item.attendanceDate <= searchForm.dateRange[1]
     }
     return matchName && matchStatus && matchDate
   })
 })
 
-const getStatusType = (status) => {
-  const types = { '正常': 'success', '迟到': 'warning', '早退': 'warning', '缺勤': 'danger', '请假': 'info', '加班': 'primary' }
-  return types[status] || 'info'
+const getStatusType = (status) => getAttendanceStatusType(status)
+
+const loadPageData = async () => {
+  loading.value = true
+  try {
+    const [attendancePage, employeePage] = await Promise.all([
+      listAttendanceApi({ page: 1, size: 200 }),
+      listEmployeesApi({ page: 1, size: 200 })
+    ])
+    attendances.value = attendancePage.items || []
+    employees.value = employeePage.items || []
+  } catch (error) {
+    ElMessage.error(error.message || '考勤数据加载失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const canAddAttendance = computed(() => userStore.hasPermission('attendance:record:add'))
-const canEditAttendance = computed(() => userStore.hasPermission('attendance:record:edit'))
-const canManageAttendance = computed(() => canAddAttendance.value || canEditAttendance.value)
+const resetForm = () => {
+  Object.assign(form, {
+    attendanceId: null,
+    empId: '',
+    attendanceDate: '',
+    clockIn: '',
+    clockOut: '',
+    status: ATTENDANCE_STATUS.normal,
+    remark: ''
+  })
+}
 
 const handleAdd = () => {
-  Object.assign(form, { attendanceId: null, empId: '', attendanceDate: '', clockIn: '', clockOut: '', status: '正常', remark: '' })
+  resetForm()
   dialogVisible.value = true
 }
 
 const handleEdit = (row) => {
-  Object.assign(form, { ...row })
+  Object.assign(form, {
+    attendanceId: row.attendanceId,
+    empId: row.empId,
+    attendanceDate: row.attendanceDate,
+    clockIn: row.clockIn,
+    clockOut: row.clockOut,
+    status: row.status,
+    remark: row.remark || ''
+  })
   dialogVisible.value = true
 }
 
 const handleSubmit = async () => {
   if (!formRef.value) return
-  await formRef.value.validate((valid) => {
-    if (valid) {
-      const emp = employees.find(e => e.empId === form.empId)
-      if (form.attendanceId) {
-        const index = attendances.value.findIndex(a => a.attendanceId === form.attendanceId)
-        if (index > -1) {
-          attendances.value[index] = { ...form, empName: emp?.empName }
-        }
-        ElMessage.success('修改成功')
-      } else {
-        const newId = Math.max(...attendances.value.map(a => a.attendanceId)) + 1
-        attendances.value.push({ ...form, attendanceId: newId, empName: emp?.empName })
-        ElMessage.success('新增成功')
-      }
-      dialogVisible.value = false
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  try {
+    const status = resolveAttendanceStatus({
+      clockIn: form.clockIn,
+      clockOut: form.clockOut,
+      currentStatus: form.status
+    })
+    const payload = {
+      empId: form.empId,
+      attendanceDate: form.attendanceDate,
+      clockIn: form.clockIn || null,
+      clockOut: form.clockOut || null,
+      status,
+      remark: form.remark
     }
-  })
+    if (form.attendanceId) {
+      await updateAttendanceApi(form.attendanceId, payload)
+      ElMessage.success('修改成功')
+    } else {
+      await createAttendanceApi(payload)
+      ElMessage.success('新增成功')
+    }
+    dialogVisible.value = false
+    await loadPageData()
+  } catch (error) {
+    ElMessage.error(error.message || '保存失败')
+  }
 }
 
 const handleReset = () => {
-  Object.assign(searchForm, { empName: '', deptId: '', status: '', dateRange: [] })
+  Object.assign(searchForm, { empName: '', status: '', dateRange: [] })
 }
+
+onMounted(loadPageData)
 </script>
 
 <template>
-  <div class="attendance-page">
-    <!-- 搜索区域 -->
+  <div class="attendance-page" v-loading="loading">
     <el-card shadow="never" class="search-card">
       <el-form :model="searchForm" inline>
         <el-form-item label="员工姓名">
-          <el-input v-model="searchForm.empName" placeholder="请输入" clearable style="width: 150px" />
+          <el-input v-model="searchForm.empName" placeholder="请输入员工姓名" clearable style="width: 150px" />
         </el-form-item>
         <el-form-item label="考勤状态">
           <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
-            <el-option v-for="s in statusOptions" :key="s" :label="s" :value="s" />
+            <el-option v-for="item in statusOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="日期范围">
-          <el-date-picker v-model="searchForm.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" style="width: 240px" />
+          <el-date-picker
+            v-model="searchForm.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 240px"
+          />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary"><el-icon><Search /></el-icon>搜索</el-button>
-          <el-button @click="handleReset"><el-icon><Refresh /></el-icon>重置</el-button>
+          <el-button type="primary">搜索</el-button>
+          <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <!-- 表格区域 -->
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
           <span>考勤记录</span>
-          <el-button v-if="canAddAttendance" type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新增记录</el-button>
+          <el-button v-if="canAddAttendance" type="primary" @click="handleAdd">新增记录</el-button>
         </div>
       </template>
       <el-table :data="filteredAttendances" stripe border>
         <el-table-column prop="attendanceId" label="ID" width="70" align="center" />
-        <el-table-column prop="empName" label="员工姓名" width="100" />
+        <el-table-column label="员工姓名" width="110">
+          <template #default="{ row }">{{ employeeNameMap[row.empId] || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="attendanceDate" label="考勤日期" width="120" />
         <el-table-column prop="clockIn" label="上班打卡" width="100">
           <template #default="{ row }">{{ row.clockIn || '-' }}</template>
@@ -147,12 +218,12 @@ const handleReset = () => {
         <el-table-column prop="clockOut" label="下班打卡" width="100">
           <template #default="{ row }">{{ row.clockOut || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="status" label="考勤状态" width="100" align="center">
+        <el-table-column prop="status" label="考勤状态" min-width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="150" />
+        <el-table-column prop="remark" label="备注" min-width="220" show-overflow-tooltip />
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button v-if="canEditAttendance" type="primary" link @click="handleEdit(row)">编辑</el-button>
@@ -161,9 +232,8 @@ const handleReset = () => {
       </el-table>
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="form.attendanceId ? '编辑考勤' : '新增考勤'" width="500px" destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
+    <el-dialog v-model="dialogVisible" :title="form.attendanceId ? '编辑考勤' : '新增考勤'" width="520px" destroy-on-close>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="员工" prop="empId">
           <el-select v-model="form.empId" placeholder="请选择员工" style="width: 100%" :disabled="!!form.attendanceId">
             <el-option v-for="emp in visibleEmployees" :key="emp.empId" :label="emp.empName" :value="emp.empId" />
@@ -178,13 +248,13 @@ const handleReset = () => {
         <el-form-item label="下班打卡" prop="clockOut">
           <el-time-picker v-model="form.clockOut" placeholder="选择时间" format="HH:mm" value-format="HH:mm" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="考勤状态" prop="status">
+        <el-form-item label="状态参考">
           <el-select v-model="form.status" style="width: 100%">
-            <el-option v-for="s in statusOptions" :key="s" :label="s" :value="s" />
+            <el-option v-for="item in statusOptions" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="请输入备注" />
+          <el-input v-model="form.remark" type="textarea" :rows="3" placeholder="可主动填写备注，留空则系统根据上下班时间智能生成" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -199,9 +269,11 @@ const handleReset = () => {
 .search-card {
   margin-bottom: 15px;
 }
+
 .search-card :deep(.el-card__body) {
   padding-bottom: 0;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;

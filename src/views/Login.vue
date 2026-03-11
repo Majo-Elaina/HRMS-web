@@ -22,21 +22,19 @@ const rules = {
 
 const handleLogin = async () => {
   if (!formRef.value) return
-  await formRef.value.validate((valid) => {
-    if (valid) {
-      loading.value = true
-      setTimeout(() => {
-        const result = userStore.login(loginForm.username, loginForm.password)
-        loading.value = false
-        if (result.success) {
-          ElMessage.success('登录成功')
-          router.push('/dashboard')
-        } else {
-          ElMessage.error(result.message)
-        }
-      }, 500)
-    }
-  })
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  loading.value = true
+  const result = await userStore.login(loginForm.username, loginForm.password)
+  loading.value = false
+
+  if (result.success) {
+    ElMessage.success('登录成功')
+    router.push('/dashboard')
+  } else {
+    ElMessage.error(result.message)
+  }
 }
 </script>
 
@@ -75,7 +73,7 @@ const handleLogin = async () => {
             class="login-btn"
             @click="handleLogin"
           >
-            登 录
+            登录
           </el-button>
         </el-form-item>
       </el-form>
@@ -141,5 +139,15 @@ const handleLogin = async () => {
 .login-tips p:first-child {
   color: #606266;
   font-weight: bold;
+}
+
+.login-container,
+.login-box,
+.login-header,
+.login-tips,
+.login-tips p,
+.login-form {
+  user-select: text;
+  caret-color: auto;
 }
 </style>
