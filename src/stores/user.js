@@ -1,4 +1,4 @@
-﻿import { defineStore } from 'pinia'
+import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getProfileApi, loginApi } from '@/api/auth'
 import { listModuleScopeConfigsApi } from '@/api/moduleScope'
@@ -289,7 +289,10 @@ const matchIdentityTag = (expectedTag, actualTag) => {
 }
 
 const getIdentityTagByEmpId = (empId, fallback) => {
-  if (fallback?.identityTag) return fallback.identityTag
+  const storedTag = fallback?.identityTag
+  if (storedTag && !['EMPLOYEE', 'MANAGER'].includes(storedTag)) {
+    return storedTag
+  }
   return resolveIdentityTag(fallback)
 }
 

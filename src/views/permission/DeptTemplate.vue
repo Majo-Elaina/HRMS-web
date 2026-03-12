@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { listDepartmentsApi } from '@/api/department'
@@ -92,11 +92,15 @@ const handleSave = async () => {
 }
 
 const handleResetDefault = () => {
-  ElMessageBox.confirm('确定清空所有部门模板配置吗？清空后将由其他权限规则自行决定展示效果。', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
+  ElMessageBox.confirm(
+    '确定清空所有部门模板配置吗？清空后将由其他权限规则自行决定展示效果。',
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
     saving.value = true
     try {
       await Promise.all(departments.value.map((department) => (
@@ -131,15 +135,18 @@ onMounted(loadPageData)
       </template>
 
       <el-table :data="tableRows" stripe border>
-        <el-table-column prop="deptName" label="部门名称" width="200" />
-        <el-table-column label="可见模块" min-width="360">
+        <el-table-column prop="deptName" label="部门名称" width="220" />
+        <el-table-column label="可见模块" min-width="420">
           <template #default="{ row }">
-            <el-empty v-if="!row.modules.length" :image-size="40" description="未配置" />
-            <template v-else>
+            <div v-if="!row.modules.length" class="empty-modules">
+              <span class="empty-modules__badge">未配置</span>
+              <span class="empty-modules__text">当前部门还没有设置可见模块，点击右侧“编辑”即可配置</span>
+            </div>
+            <div v-else class="module-tag-list">
               <el-tag v-for="moduleCode in row.modules" :key="moduleCode" class="module-tag">
                 {{ moduleLabelMap[moduleCode] || moduleCode }}
               </el-tag>
-            </template>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -190,8 +197,49 @@ onMounted(loadPageData)
   gap: 10px;
 }
 
+.module-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .module-tag {
-  margin-right: 6px;
-  margin-bottom: 6px;
+  margin: 0;
+}
+
+.empty-modules {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 10px 14px;
+  border: 1px dashed rgba(59, 130, 246, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(56, 189, 248, 0.05));
+}
+
+.empty-modules__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.empty-modules__text {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+:deep(.el-table .cell) {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 </style>

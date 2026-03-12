@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { use } from 'echarts/core'
-import { BarChart, LineChart, PieChart } from 'echarts/charts'
+import { BarChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
@@ -16,22 +16,12 @@ import { createLeaveRequestApi, listLeaveRequestsApi, updateLeaveRequestApi } fr
 import { listPositionsApi } from '@/api/position'
 import { getReportSummaryApi } from '@/api/report'
 import { listSalaryRecordsApi } from '@/api/salaryRecord'
-import {
-  ATTENDANCE_STATUS,
-  getAttendanceStatusType,
-  resolveAttendanceStatus
-} from '@/utils/smartRemark'
+import { ATTENDANCE_STATUS, getAttendanceStatusType, resolveAttendanceStatus } from '@/utils/smartRemark'
 
-use([CanvasRenderer, PieChart, BarChart, LineChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
+use([CanvasRenderer, PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const router = useRouter()
 const userStore = useUserStore()
-
-const loading = ref(false)
-const attendanceSubmitting = ref(false)
-const leaveSubmitting = ref(false)
-const leaveDialogVisible = ref(false)
-const leaveFormRef = ref(null)
 
 const LEAVE_TYPES = ['年假', '病假', '事假', '婚假', '产假', '陪产假', '丧假']
 const LEAVE_STATUS = {
@@ -41,6 +31,12 @@ const LEAVE_STATUS = {
   rejected: '已拒绝',
   canceled: '已取消'
 }
+
+const loading = ref(false)
+const attendanceSubmitting = ref(false)
+const leaveSubmitting = ref(false)
+const leaveDialogVisible = ref(false)
+const leaveFormRef = ref(null)
 
 const summary = ref({
   totalEmployees: 0,
@@ -68,14 +64,12 @@ const leaveForm = reactive({
 const leaveRules = {
   leaveType: [{ required: true, message: '请选择请假类型', trigger: 'change' }],
   startDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
-  endDate: [{ required: true, message: '请选择结束日期', trigger: 'change' }],
-  days: [{ required: true, message: '请输入请假天数', trigger: 'blur' }]
+  endDate: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
 }
 
-const leaveTypes = LEAVE_TYPES
-const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
 const today = computed(() => new Date().toISOString().slice(0, 10))
 const currentEmployee = computed(() => employees.value.find(item => item.empId === userStore.empId) || null)
+const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
 
 const getDeptName = (deptId) => departments.value.find(item => item.deptId === deptId)?.deptName || '-'
 const getPositionName = (positionId) => positions.value.find(item => item.positionId === positionId)?.positionName || '-'
@@ -101,22 +95,19 @@ const matchDays = (rule, days) => {
   return false
 }
 
-const getRuleMatchScore = (rule, applicantTag, days) => {
-  if (!matchDays(rule, days)) return 0
-  if (rule.applicantTag === applicantTag) return 2
-  if (userStore.matchIdentityTag(rule.applicantTag, applicantTag)) return 1
-  return 0
-}
-
 const getMatchedRule = (empId, days) => {
   const applicantTag = getEmployeeTag(empId)
   return [...approvalRules.value]
-    .map(rule => ({ rule, score: getRuleMatchScore(rule, applicantTag, days) }))
-    .filter(item => item.score > 0)
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score
-      return (a.rule.sortOrder ?? 0) - (b.rule.sortOrder ?? 0)
+    .map(rule => {
+      let score = 0
+      if (matchDays(rule, days)) {
+        if (rule.applicantTag === applicantTag) score = 2
+        else if (userStore.matchIdentityTag(rule.applicantTag, applicantTag)) score = 1
+      }
+      return { rule, score }
     })
+    .filter(item => item.score > 0)
+    .sort((a, b) => (b.score - a.score) || ((a.rule.sortOrder ?? 0) - (b.rule.sortOrder ?? 0)))
     .map(item => item.rule)[0]
 }
 
@@ -134,18 +125,32 @@ const getNormalizedApprovalPayload = (leave) => {
   const chain = getApprovalChain(leave)
   if (leave.status === LEAVE_STATUS.pending1) {
     return {
+      status: LEAVE_STATUS.pending1,
       pendingApproverTag: chain.firstApproverTag,
       pendingApproverScope: chain.firstApproverScope,
       nextApproverTag: chain.secondApproverTag || '',
-      nextApproverScope: chain.secondApproverTag ? chain.secondApproverScope : ''
+      nextApproverScope: chain.secondApproverTag ? chain.secondApproverScope : '',
+      approveTime: leave.approveTime || ''
     }
   }
   if (leave.status === LEAVE_STATUS.pending2) {
+    if (!chain.secondApproverTag) {
+      return {
+        status: LEAVE_STATUS.approved,
+        pendingApproverTag: '',
+        pendingApproverScope: 'company',
+        nextApproverTag: '',
+        nextApproverScope: '',
+        approveTime: leave.approveTime || new Date().toISOString().slice(0, 19)
+      }
+    }
     return {
-      pendingApproverTag: chain.secondApproverTag || '',
-      pendingApproverScope: chain.secondApproverTag ? chain.secondApproverScope : 'company',
+      status: LEAVE_STATUS.pending2,
+      pendingApproverTag: chain.secondApproverTag,
+      pendingApproverScope: chain.secondApproverScope || 'company',
       nextApproverTag: '',
-      nextApproverScope: ''
+      nextApproverScope: '',
+      approveTime: leave.approveTime || ''
     }
   }
   return null
@@ -154,113 +159,25 @@ const getNormalizedApprovalPayload = (leave) => {
 const shouldNormalizeApproval = (leave) => {
   const normalized = getNormalizedApprovalPayload(leave)
   if (!normalized) return false
-  return normalized.pendingApproverTag !== (leave.pendingApproverTag || '')
+  return normalized.status !== leave.status
+    || normalized.pendingApproverTag !== (leave.pendingApproverTag || '')
     || normalized.pendingApproverScope !== (leave.pendingApproverScope || '')
     || normalized.nextApproverTag !== (leave.nextApproverTag || '')
     || normalized.nextApproverScope !== (leave.nextApproverScope || '')
+    || (normalized.approveTime || '') !== (leave.approveTime || '')
 }
 
 const normalizeLeaveRequests = async (items) => {
   const pendingItems = (items || []).filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
   const corrections = pendingItems.filter(shouldNormalizeApproval)
   if (!corrections.length) return items || []
-
   await Promise.all(corrections.map((item) => {
     const normalized = getNormalizedApprovalPayload(item)
-    return updateLeaveRequestApi(item.leaveId, {
-      ...item,
-      ...normalized,
-      days: String(item.days)
-    })
+    return updateLeaveRequestApi(item.leaveId, { ...item, ...normalized, days: String(item.days) })
   }))
-
   const refreshed = await listLeaveRequestsApi({ page: 1, size: 500 })
   return refreshed.items || []
 }
-
-const getPendingApprover = (leave) => {
-  const chain = getApprovalChain(leave)
-  if (leave.status === LEAVE_STATUS.pending1) {
-    return {
-      tag: chain.firstApproverTag,
-      scope: chain.firstApproverScope
-    }
-  }
-  if (leave.status === LEAVE_STATUS.pending2) {
-    return {
-      tag: chain.secondApproverTag || leave.pendingApproverTag,
-      scope: chain.secondApproverScope
-    }
-  }
-  return { tag: '', scope: 'company' }
-}
-
-const monthKeys = computed(() => {
-  const now = new Date()
-  return Array.from({ length: 6 }).map((_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1)
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-  })
-})
-
-const attendanceStatsByMonth = computed(() => {
-  const initial = monthKeys.value.reduce((acc, key) => {
-    acc[key] = { normal: 0, late: 0, early: 0, absent: 0, overtime: 0 }
-    return acc
-  }, {})
-
-  attendanceRecords.value.forEach((item) => {
-    const month = String(item.attendanceDate || '').slice(0, 7)
-    if (!initial[month]) return
-    const status = String(item.status || '')
-    if (status.includes(ATTENDANCE_STATUS.normal)) initial[month].normal += 1
-    if (status.includes(ATTENDANCE_STATUS.late)) initial[month].late += 1
-    if (status.includes(ATTENDANCE_STATUS.early)) initial[month].early += 1
-    if (status.includes(ATTENDANCE_STATUS.absent)) initial[month].absent += 1
-    if (status.includes(ATTENDANCE_STATUS.overtime)) initial[month].overtime += 1
-  })
-
-  return initial
-})
-
-const salaryStatsByMonth = computed(() => {
-  const initial = monthKeys.value.reduce((acc, key) => {
-    acc[key] = { total: 0, count: 0 }
-    return acc
-  }, {})
-
-  salaryRecords.value.forEach((item) => {
-    const month = String(item.salaryMonth || '').slice(0, 7)
-    if (!initial[month]) return
-    initial[month].total += Number(item.netSalary || 0)
-    initial[month].count += 1
-  })
-
-  return initial
-})
-
-const pendingLeaves = computed(() => {
-  return leaveRequests.value
-    .filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
-    .filter((item) => {
-      const emp = employees.value.find(empItem => empItem.empId === item.empId)
-      if (leaveScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
-      if (leaveScope.value === 'self' && item.empId !== userStore.empId) return false
-      return true
-    })
-    .filter((item) => {
-      if (!userStore.hasPermission('attendance:leave:approve')) return false
-      const pending = getPendingApprover(item)
-      if (!pending.tag) return false
-      if (!userStore.matchIdentityTag(pending.tag, userStore.identityTag)) return false
-      if (pending.scope === 'dept') {
-        const emp = employees.value.find(empItem => empItem.empId === item.empId)
-        return emp?.deptId === userStore.deptId
-      }
-      if (pending.scope === 'self') return item.empId === userStore.empId
-      return true
-    })
-})
 
 const personalAttendance = computed(() => {
   return [...attendanceRecords.value]
@@ -275,9 +192,25 @@ const personalLeaveList = computed(() => {
     .slice(0, 5)
 })
 
+const pendingLeaves = computed(() => {
+  return leaveRequests.value
+    .filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
+    .filter((item) => {
+      const emp = employees.value.find(empItem => empItem.empId === item.empId)
+      if (leaveScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
+      if (leaveScope.value === 'self' && item.empId !== userStore.empId) return false
+      const pending = item.status === LEAVE_STATUS.pending1
+        ? { tag: getApprovalChain(item).firstApproverTag, scope: 'company' }
+        : { tag: getApprovalChain(item).secondApproverTag || item.pendingApproverTag, scope: getApprovalChain(item).secondApproverScope || 'company' }
+      if (!pending.tag) return false
+      if (!userStore.matchIdentityTag(pending.tag, userStore.identityTag)) return false
+      if (pending.scope === 'dept') return emp?.deptId === userStore.deptId
+      return true
+    })
+})
+
 const canClockIn = computed(() => !!userStore.empId && !personalAttendance.value?.clockIn)
 const canClockOut = computed(() => !!userStore.empId && !!personalAttendance.value?.clockIn && !personalAttendance.value?.clockOut)
-
 const attendanceTagType = computed(() => getAttendanceStatusType(personalAttendance.value?.status))
 
 const metricCards = computed(() => [
@@ -288,60 +221,42 @@ const metricCards = computed(() => [
 ])
 
 const deptChartOption = computed(() => ({
-  title: { text: '部门人员分布', left: 'center', textStyle: { fontSize: 18, fontWeight: 700, color: '#1f2937' } },
+  title: { text: '部门人员分布', left: 'center' },
   tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
   legend: { orient: 'vertical', left: 'left', top: 'middle' },
-  series: [{
-    type: 'pie',
-    radius: ['38%', '68%'],
-    itemStyle: { borderRadius: 14, borderColor: '#fff', borderWidth: 3 },
-    label: { show: false },
-    emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
-    data: summary.value.departmentStats || []
-  }]
+  series: [{ type: 'pie', radius: ['38%', '68%'], data: summary.value.departmentStats || [] }]
 }))
 
-const attendanceChartOption = computed(() => ({
-  title: { text: '月度考勤统计', left: 'center', textStyle: { fontSize: 18, fontWeight: 700, color: '#1f2937' } },
-  tooltip: { trigger: 'axis' },
-  legend: { data: ['正常', '迟到', '早退', '缺勤', '加班'], bottom: 0 },
-  grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-  xAxis: { type: 'category', data: monthKeys.value },
-  yAxis: { type: 'value', name: '人次' },
-  series: [
-    { name: '正常', type: 'bar', stack: 'total', data: monthKeys.value.map(key => attendanceStatsByMonth.value[key].normal), itemStyle: { color: '#22c55e' } },
-    { name: '迟到', type: 'bar', stack: 'total', data: monthKeys.value.map(key => attendanceStatsByMonth.value[key].late), itemStyle: { color: '#f59e0b' } },
-    { name: '早退', type: 'bar', stack: 'total', data: monthKeys.value.map(key => attendanceStatsByMonth.value[key].early), itemStyle: { color: '#fb7185' } },
-    { name: '缺勤', type: 'bar', stack: 'total', data: monthKeys.value.map(key => attendanceStatsByMonth.value[key].absent), itemStyle: { color: '#94a3b8' } },
-    { name: '加班', type: 'bar', stack: 'total', data: monthKeys.value.map(key => attendanceStatsByMonth.value[key].overtime), itemStyle: { color: '#2563eb' } }
-  ]
-}))
-
-const salaryChartOption = computed(() => ({
-  title: { text: '月度薪资趋势', left: 'center', textStyle: { fontSize: 18, fontWeight: 700, color: '#1f2937' } },
-  tooltip: { trigger: 'axis' },
-  legend: { data: ['总薪资', '平均薪资'], bottom: 0 },
-  grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-  xAxis: { type: 'category', data: monthKeys.value },
-  yAxis: [
-    { type: 'value', name: '总薪资(元)', position: 'left' },
-    { type: 'value', name: '平均薪资(元)', position: 'right' }
-  ],
-  series: [
-    { name: '总薪资', type: 'bar', data: monthKeys.value.map(key => Number(salaryStatsByMonth.value[key].total.toFixed(2))), itemStyle: { color: '#2563eb' } },
-    {
-      name: '平均薪资',
-      type: 'line',
-      yAxisIndex: 1,
-      smooth: true,
-      data: monthKeys.value.map((key) => {
-        const item = salaryStatsByMonth.value[key]
-        return item.count ? Number((item.total / item.count).toFixed(2)) : 0
-      }),
-      itemStyle: { color: '#14b8a6' }
-    }
-  ]
-}))
+const attendanceChartOption = computed(() => {
+  const keys = ['正常', '迟到', '早退', '缺勤', '加班']
+  const monthKeys = Array.from({ length: 6 }).map((_, index) => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - (5 - index))
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  })
+  const source = monthKeys.map((month) => {
+    const bucket = { month, 正常: 0, 迟到: 0, 早退: 0, 缺勤: 0, 加班: 0 }
+    attendanceRecords.value.forEach((item) => {
+      if (String(item.attendanceDate || '').slice(0, 7) !== month) return
+      const status = String(item.status || '')
+      if (status.includes(ATTENDANCE_STATUS.normal)) bucket.正常 += 1
+      if (status.includes(ATTENDANCE_STATUS.late)) bucket.迟到 += 1
+      if (status.includes(ATTENDANCE_STATUS.early)) bucket.早退 += 1
+      if (status.includes(ATTENDANCE_STATUS.absent)) bucket.缺勤 += 1
+      if (status.includes(ATTENDANCE_STATUS.overtime)) bucket.加班 += 1
+    })
+    return bucket
+  })
+  return {
+    title: { text: '月度考勤统计', left: 'center' },
+    tooltip: { trigger: 'axis' },
+    legend: { data: keys, bottom: 0 },
+    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: { type: 'category', data: source.map(item => item.month) },
+    yAxis: { type: 'value', name: '人次' },
+    series: keys.map((key) => ({ name: key, type: 'bar', stack: 'total', data: source.map(item => item[key]) }))
+  }
+})
 
 const calculateLeaveDays = (startDate, endDate) => {
   if (!startDate || !endDate) return 1
@@ -352,22 +267,9 @@ const calculateLeaveDays = (startDate, endDate) => {
   return Math.floor(diff / 86400000) + 1
 }
 
-const resetLeaveForm = () => {
-  Object.assign(leaveForm, {
-    leaveType: LEAVE_TYPES[0],
-    startDate: '',
-    endDate: '',
-    days: 1,
-    reason: ''
-  })
-}
-
-watch(
-  () => [leaveForm.startDate, leaveForm.endDate],
-  ([startDate, endDate]) => {
-    leaveForm.days = calculateLeaveDays(startDate, endDate)
-  }
-)
+watch(() => [leaveForm.startDate, leaveForm.endDate], ([startDate, endDate]) => {
+  leaveForm.days = calculateLeaveDays(startDate, endDate)
+})
 
 const getNowTime = () => {
   const now = new Date()
@@ -387,7 +289,6 @@ const loadPageData = async () => {
       listSalaryRecordsApi({ page: 1, size: 500 }),
       listApprovalRulesApi({ page: 1, size: 200, typeCode: 'leave' })
     ])
-
     summary.value = summaryData
     employees.value = employeePage.items || []
     departments.value = departmentPage.items || []
@@ -404,38 +305,25 @@ const loadPageData = async () => {
 }
 
 const handleClockIn = async () => {
-  if (!userStore.empId) {
-    ElMessage.warning('当前用户未绑定员工信息')
-    return
-  }
-  if (!canClockIn.value) {
-    ElMessage.warning('今天已经签到')
-    return
-  }
-
+  if (!userStore.empId || !canClockIn.value) return
   attendanceSubmitting.value = true
   try {
-    const clockIn = getNowTime()
     const existed = personalAttendance.value
-    const status = resolveAttendanceStatus({
-      clockIn,
-      clockOut: existed?.clockOut || '',
-      currentStatus: existed?.status || ATTENDANCE_STATUS.normal
-    })
+    const clockIn = getNowTime()
     const payload = {
       empId: userStore.empId,
       attendanceDate: today.value,
       clockIn,
       clockOut: existed?.clockOut || null,
-      status,
+      status: resolveAttendanceStatus({
+        clockIn,
+        clockOut: existed?.clockOut || '',
+        currentStatus: existed?.status || ATTENDANCE_STATUS.normal
+      }),
       remark: existed?.remark || ''
     }
-
-    if (existed?.attendanceId) {
-      await updateAttendanceApi(existed.attendanceId, payload)
-    } else {
-      await createAttendanceApi(payload)
-    }
+    if (existed?.attendanceId) await updateAttendanceApi(existed.attendanceId, payload)
+    else await createAttendanceApi(payload)
     ElMessage.success('签到成功')
     await loadPageData()
   } catch (error) {
@@ -446,34 +334,21 @@ const handleClockIn = async () => {
 }
 
 const handleClockOut = async () => {
-  if (!userStore.empId) {
-    ElMessage.warning('当前用户未绑定员工信息')
-    return
-  }
   const existed = personalAttendance.value
-  if (!existed?.attendanceId || !existed.clockIn) {
-    ElMessage.warning('请先签到后再签退')
-    return
-  }
-  if (!canClockOut.value) {
-    ElMessage.warning('今天已经签退')
-    return
-  }
-
+  if (!userStore.empId || !existed?.attendanceId || !existed.clockIn || !canClockOut.value) return
   attendanceSubmitting.value = true
   try {
     const clockOut = getNowTime()
-    const status = resolveAttendanceStatus({
-      clockIn: existed.clockIn || '',
-      clockOut,
-      currentStatus: existed.status || ATTENDANCE_STATUS.normal
-    })
     await updateAttendanceApi(existed.attendanceId, {
       empId: existed.empId,
       attendanceDate: existed.attendanceDate,
       clockIn: existed.clockIn || null,
       clockOut,
-      status,
+      status: resolveAttendanceStatus({
+        clockIn: existed.clockIn || '',
+        clockOut,
+        currentStatus: existed.status || ATTENDANCE_STATUS.normal
+      }),
       remark: existed.remark || ''
     })
     ElMessage.success('签退成功')
@@ -486,42 +361,37 @@ const handleClockOut = async () => {
 }
 
 const openLeaveDialog = () => {
-  if (!userStore.empId) {
-    ElMessage.warning('当前用户未绑定员工信息')
-    return
-  }
-  resetLeaveForm()
+  leaveForm.leaveType = LEAVE_TYPES[0]
+  leaveForm.startDate = ''
+  leaveForm.endDate = ''
+  leaveForm.days = 1
+  leaveForm.reason = ''
   leaveDialogVisible.value = true
-}
-
-const buildLeavePayload = () => {
-  const rule = getMatchedRule(userStore.empId, leaveForm.days)
-  return {
-    empId: userStore.empId,
-    leaveType: leaveForm.leaveType,
-    startDate: leaveForm.startDate,
-    endDate: leaveForm.endDate,
-    days: String(leaveForm.days),
-    reason: leaveForm.reason,
-    status: LEAVE_STATUS.pending1,
-    pendingApproverTag: rule?.firstApproverTag || 'ADMIN',
-    pendingApproverScope: 'company',
-    nextApproverTag: rule?.secondApproverTag || '',
-    nextApproverScope: rule?.secondApproverScope || 'dept',
-    applyTime: new Date().toISOString().slice(0, 19)
-  }
 }
 
 const handleSubmitLeave = async () => {
   if (!leaveFormRef.value) return
   const valid = await leaveFormRef.value.validate().catch(() => false)
   if (!valid) return
-
   leaveSubmitting.value = true
   try {
-    await createLeaveRequestApi(buildLeavePayload())
+    const rule = getMatchedRule(userStore.empId, leaveForm.days)
+    await createLeaveRequestApi({
+      empId: userStore.empId,
+      leaveType: leaveForm.leaveType,
+      startDate: leaveForm.startDate,
+      endDate: leaveForm.endDate,
+      days: String(leaveForm.days),
+      reason: leaveForm.reason,
+      status: LEAVE_STATUS.pending1,
+      pendingApproverTag: rule?.firstApproverTag || 'ADMIN',
+      pendingApproverScope: 'company',
+      nextApproverTag: rule?.secondApproverTag || '',
+      nextApproverScope: rule?.secondApproverScope || 'dept',
+      applyTime: new Date().toISOString().slice(0, 19)
+    })
     leaveDialogVisible.value = false
-    ElMessage.success('请假申请已提交')
+    ElMessage.success('请假申请提交成功')
     await loadPageData()
   } catch (error) {
     ElMessage.error(error.message || '请假申请提交失败')
@@ -536,19 +406,16 @@ onMounted(loadPageData)
 <template>
   <div class="dashboard" v-loading="loading">
     <section class="hero-panel">
-      <div class="hero-copy">
-        <div class="eyebrow">智能人事总览</div>
+      <div>
+        <div class="eyebrow">企业人事管理系统</div>
         <h1>欢迎回来，{{ userStore.user?.empName }}</h1>
-        <p class="hero-desc">
-          你当前的角色是 {{ userStore.user?.roleName }}，可在首页直接完成个人签到、请假申请，并快速查看待处理事务与核心经营指标。
-        </p>
+        <p class="hero-desc">当前角色为 {{ userStore.user?.roleName }}，你可以在首页快速完成个人考勤与请假申请。</p>
         <div class="hero-meta">
           <span>所属部门：{{ userStore.user?.deptName || '-' }}</span>
           <span>当前岗位：{{ userStore.user?.positionName || '-' }}</span>
-          <span>今日日期：{{ today }}</span>
+          <span>日期：{{ today }}</span>
         </div>
       </div>
-
       <div class="hero-actions">
         <el-button class="hero-btn" @click="router.push('/attendance/record')">进入考勤管理</el-button>
         <el-button class="hero-btn" @click="router.push('/attendance/leave')">进入请假管理</el-button>
@@ -556,145 +423,81 @@ onMounted(loadPageData)
     </section>
 
     <section class="metrics-grid">
-      <el-card v-for="item in metricCards" :key="item.label" shadow="hover" class="metric-card">
-        <div class="metric-shell" :class="item.tone">
-          <div class="metric-icon">
-            <el-icon size="28"><component :is="item.icon" /></el-icon>
-          </div>
-          <div class="metric-body">
-            <div class="metric-label">{{ item.label }}</div>
-            <div class="metric-value">{{ item.value }}</div>
-          </div>
+      <el-card v-for="item in metricCards" :key="item.label" shadow="hover">
+        <div class="metric">
+          <div class="metric-label">{{ item.label }}</div>
+          <div class="metric-value">{{ item.value }}</div>
         </div>
       </el-card>
     </section>
 
-    <el-row :gutter="20" class="action-row">
+    <el-row :gutter="20" class="content-row">
       <el-col :xs="24" :lg="12">
-        <el-card shadow="hover" class="feature-card">
-          <template #header>
-            <div class="card-header">
-              <div>
-                <div class="card-title">个人考勤</div>
-                <div class="card-subtitle">个人签到签退与今日状态总览</div>
-              </div>
-              <span class="pill">{{ today }}</span>
-            </div>
-          </template>
-
-          <div class="attendance-grid">
-            <div class="info-tile">
-              <span class="tile-label">员工</span>
-              <strong>{{ currentEmployee?.empName || userStore.user?.empName || '-' }}</strong>
-            </div>
-            <div class="info-tile">
-              <span class="tile-label">签到时间</span>
-              <strong>{{ personalAttendance?.clockIn || '未签到' }}</strong>
-            </div>
-            <div class="info-tile">
-              <span class="tile-label">签退时间</span>
-              <strong>{{ personalAttendance?.clockOut || '未签退' }}</strong>
-            </div>
-            <div class="info-tile">
-              <span class="tile-label">当前状态</span>
-              <el-tag round :type="attendanceTagType">
-                {{ personalAttendance?.status || '未生成记录' }}
-              </el-tag>
-            </div>
+        <el-card shadow="hover">
+          <template #header><div class="card-header"><span>个人考勤</span><span class="pill">{{ today }}</span></div></template>
+          <div class="grid-two">
+            <div class="tile"><span>员工</span><strong>{{ currentEmployee?.empName || userStore.user?.empName || '-' }}</strong></div>
+            <div class="tile"><span>签到时间</span><strong>{{ personalAttendance?.clockIn || '未签到' }}</strong></div>
+            <div class="tile"><span>签退时间</span><strong>{{ personalAttendance?.clockOut || '未签退' }}</strong></div>
+            <div class="tile"><span>当前状态</span><el-tag :type="attendanceTagType">{{ personalAttendance?.status || '未生成记录' }}</el-tag></div>
           </div>
-
-          <div class="action-buttons">
+          <div class="actions">
             <el-button type="primary" :loading="attendanceSubmitting" :disabled="!canClockIn" @click="handleClockIn">上班签到</el-button>
             <el-button type="success" :loading="attendanceSubmitting" :disabled="!canClockOut" @click="handleClockOut">下班签退</el-button>
             <el-button @click="router.push('/attendance/record')">查看考勤记录</el-button>
           </div>
-
-          <div class="tips-text">状态会同时判断上班和下班时间。两项都正常显示“正常”；若上班、下班分别异常，则会组合显示，例如“迟到/早退”或“迟到/加班”。</div>
         </el-card>
       </el-col>
-
       <el-col :xs="24" :lg="12">
-        <el-card shadow="hover" class="feature-card">
-          <template #header>
-            <div class="card-header">
+        <el-card shadow="hover">
+          <template #header><div class="card-header"><span>个人请假申请</span><el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button></div></template>
+          <div v-if="personalLeaveList.length" class="leave-list">
+            <div v-for="item in personalLeaveList" :key="item.leaveId" class="leave-item">
               <div>
-                <div class="card-title">个人请假申请</div>
-                <div class="card-subtitle">最近申请记录与审批状态</div>
+                <div class="leave-type">{{ item.leaveType }}</div>
+                <div class="leave-time">{{ item.startDate }} 至 {{ item.endDate }}</div>
               </div>
-              <el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button>
+              <el-tag :type="item.status === LEAVE_STATUS.approved ? 'success' : item.status === LEAVE_STATUS.rejected ? 'danger' : 'warning'">{{ item.status }}</el-tag>
             </div>
-          </template>
-
-          <div class="leave-list">
-            <div v-if="personalLeaveList.length" class="leave-list-inner">
-              <article v-for="item in personalLeaveList" :key="item.leaveId" class="leave-item">
-                <div>
-                  <div class="leave-type">{{ item.leaveType }}</div>
-                  <div class="leave-time">{{ item.startDate }} 至 {{ item.endDate }}</div>
-                </div>
-                <div class="leave-side">
-                  <div class="leave-days">{{ item.days }} 天</div>
-                  <el-tag round :type="item.status === LEAVE_STATUS.approved ? 'success' : item.status === LEAVE_STATUS.rejected ? 'danger' : 'warning'">
-                    {{ item.status }}
-                  </el-tag>
-                </div>
-              </article>
-            </div>
-            <el-empty v-else description="暂无个人请假记录" :image-size="90" />
           </div>
-
-          <div class="action-buttons">
+          <el-empty v-else description="暂无个人请假记录" :image-size="80" />
+          <div class="actions">
             <el-button type="primary" @click="openLeaveDialog">发起请假申请</el-button>
           </div>
-
-          <div class="tips-text">请假申请与请假管理菜单共用同一套字段和审批规则，提交后直接写入数据库。</div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" class="chart-row">
+    <el-row :gutter="20" class="content-row">
       <el-col :xs="24" :xl="12">
-        <el-card shadow="hover" class="chart-card">
-          <v-chart class="chart" :option="deptChartOption" autoresize />
-        </el-card>
+        <el-card shadow="hover"><v-chart class="chart" :option="deptChartOption" autoresize /></el-card>
       </el-col>
       <el-col :xs="24" :xl="12">
-        <el-card shadow="hover" class="chart-card">
-          <v-chart class="chart" :option="attendanceChartOption" autoresize />
-        </el-card>
+        <el-card shadow="hover"><v-chart class="chart" :option="attendanceChartOption" autoresize /></el-card>
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" class="chart-row">
-      <el-col :xs="24" :xl="16">
-        <el-card shadow="hover" class="chart-card">
-          <v-chart class="chart" :option="salaryChartOption" autoresize />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :xl="8">
-        <el-card shadow="hover" class="pending-card">
-          <template #header>
-            <div class="card-header">
-              <div>
-                <div class="card-title">待处理请假申请</div>
-                <div class="card-subtitle">当前你有审批权限的待办事项</div>
-              </div>
-              <el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button>
-            </div>
-          </template>
+    <el-row :gutter="20" class="content-row">
+      <el-col :xs="24" :xl="12">
+        <el-card shadow="hover">
+          <template #header><div class="card-header"><span>待处理请假</span><el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button></div></template>
           <el-table :data="pendingLeaves" size="small" max-height="300">
-            <el-table-column label="申请人" width="96">
+            <el-table-column label="申请人">
               <template #default="{ row }">{{ employees.find(item => item.empId === row.empId)?.empName || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="leaveType" label="类型" width="78" />
-            <el-table-column prop="days" label="天数" width="64" />
-            <el-table-column label="状态">
-              <template #default="{ row }">
-                <el-tag round :type="row.status === LEAVE_STATUS.pending1 || row.status === LEAVE_STATUS.pending2 ? 'warning' : 'primary'" size="small">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
+            <el-table-column prop="leaveType" label="类型" width="80" />
+            <el-table-column prop="days" label="天数" width="70" />
+            <el-table-column prop="status" label="状态" width="120" />
+          </el-table>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :xl="12">
+        <el-card shadow="hover">
+          <template #header><div class="card-header"><span>近期薪资记录</span></div></template>
+          <el-table :data="salaryRecords.slice(0, 6)" size="small" max-height="300">
+            <el-table-column prop="salaryMonth" label="月份" width="110" />
+            <el-table-column prop="netSalary" label="实发工资" />
+            <el-table-column prop="status" label="状态" width="110" />
           </el-table>
         </el-card>
       </el-col>
@@ -716,10 +519,10 @@ onMounted(loadPageData)
         <el-form-item label="结束日期" prop="endDate">
           <el-date-picker v-model="leaveForm.endDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择结束日期" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="请假天数" prop="days">
+        <el-form-item label="请假天数">
           <el-input :model-value="`${leaveForm.days} 天`" readonly />
         </el-form-item>
-        <el-form-item label="请假原因" prop="reason">
+        <el-form-item label="请假原因">
           <el-input v-model="leaveForm.reason" type="textarea" :rows="3" placeholder="请输入请假原因" />
         </el-form-item>
       </el-form>
@@ -732,322 +535,29 @@ onMounted(loadPageData)
 </template>
 
 <style scoped>
-.dashboard {
-  padding: 0;
-}
-
-.hero-panel {
-  display: flex;
-  justify-content: space-between;
-  gap: 28px;
-  padding: 32px;
-  margin-bottom: 22px;
-  border-radius: 28px;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 16% 20%, rgba(255, 255, 255, 0.26), transparent 18%),
-    radial-gradient(circle at 88% 18%, rgba(45, 212, 191, 0.28), transparent 22%),
-    linear-gradient(135deg, #0f3f85 0%, #145da0 38%, #127a72 100%);
-  box-shadow: 0 24px 60px rgba(15, 63, 133, 0.28);
-}
-
-.hero-panel::after {
-  content: '';
-  position: absolute;
-  inset: auto -40px -90px auto;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  filter: blur(4px);
-}
-
-.hero-copy {
-  position: relative;
-  z-index: 1;
-  max-width: 860px;
-}
-
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  font-size: 12px;
-  letter-spacing: 1px;
-  margin-bottom: 14px;
-}
-
-.hero-copy h1 {
-  margin: 0;
-  font-size: 42px;
-  line-height: 1.1;
-  font-weight: 800;
-}
-
-.hero-desc {
-  margin: 16px 0 0;
-  max-width: 700px;
-  line-height: 1.75;
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.88);
-}
-
-.hero-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 22px;
-}
-
-.hero-meta span {
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.hero-actions {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.hero-btn {
-  min-width: 138px;
-  height: 40px;
-  border-radius: 14px;
-  border-color: rgba(255, 255, 255, 0.36);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-}
-
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
-  margin-bottom: 22px;
-}
-
-.metric-card {
-  border-radius: 24px;
-}
-
-.metric-shell {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.metric-icon {
-  width: 76px;
-  height: 76px;
-  border-radius: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  box-shadow: 0 18px 32px rgba(37, 99, 235, 0.18);
-}
-
-.metric-shell.blue .metric-icon { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
-.metric-shell.green .metric-icon { background: linear-gradient(135deg, #65a30d, #84cc16); }
-.metric-shell.amber .metric-icon { background: linear-gradient(135deg, #d97706, #f59e0b); }
-.metric-shell.red .metric-icon { background: linear-gradient(135deg, #ef4444, #fb7185); }
-
-.metric-label {
-  color: #64748b;
-  font-size: 15px;
-}
-
-.metric-value {
-  margin-top: 8px;
-  font-size: 44px;
-  line-height: 1;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.action-row,
-.chart-row {
-  margin-bottom: 22px;
-}
-
-.feature-card :deep(.el-card__body),
-.pending-card :deep(.el-card__body) {
-  padding: 24px;
-}
-
-.chart-card :deep(.el-card__body) {
-  padding: 18px 12px 10px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.card-title {
-  font-size: 24px;
-  line-height: 1.1;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.card-subtitle {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #eef6ff;
-  color: #2563eb;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.attendance-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.info-tile {
-  padding: 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
-}
-
-.tile-label {
-  display: block;
-  margin-bottom: 8px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.info-tile strong {
-  color: #0f172a;
-  font-size: 17px;
-}
-
-.action-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.action-buttons :deep(.el-button) {
-  min-width: 120px;
-  border-radius: 14px;
-}
-
-.tips-text {
-  margin-top: 16px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #f8fafc;
-  color: #64748b;
-  line-height: 1.7;
-  font-size: 13px;
-}
-
-.leave-list {
-  min-height: 224px;
-}
-
-.leave-list-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.leave-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
-}
-
-.leave-type {
-  color: #0f172a;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.leave-time {
-  margin-top: 6px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.leave-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.leave-days {
-  color: #475569;
-  font-size: 13px;
-}
-
-.chart {
-  height: 340px;
-}
-
-@media (max-width: 1400px) {
-  .metrics-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .hero-panel {
-    flex-direction: column;
-    padding: 24px;
-  }
-
-  .hero-copy h1 {
-    font-size: 34px;
-  }
-
-  .attendance-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .metrics-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .action-buttons {
-    flex-direction: column;
-  }
-
-  .action-buttons :deep(.el-button) {
-    margin-left: 0;
-    width: 100%;
-  }
-}
-</style>
+.hero-panel { display: flex; justify-content: space-between; gap: 24px; padding: 32px; margin-bottom: 22px; border-radius: 28px; color: #fff; background: linear-gradient(135deg, #0f3f85 0%, #145da0 38%, #127a72 100%); }
+.eyebrow { display: inline-flex; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.14); font-size: 12px; margin-bottom: 14px; }
+.hero-desc { margin: 16px 0 0; line-height: 1.75; color: rgba(255,255,255,.88); }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+.hero-meta span, .pill { padding: 8px 12px; border-radius: 999px; background: rgba(255,255,255,.14); }
+.hero-actions { display: flex; gap: 14px; }
+.hero-btn { min-width: 138px; color: #fff; border-color: rgba(255,255,255,.36); background: rgba(255,255,255,.08); }
+.metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 20px; margin-bottom: 22px; }
+.metric-label { color: #64748b; font-size: 15px; }
+.metric-value { margin-top: 8px; font-size: 40px; font-weight: 800; color: #0f172a; }
+.content-row { margin-bottom: 22px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+.grid-two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin-bottom: 18px; }
+.tile { padding: 18px; border-radius: 18px; background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%); }
+.tile span { display: block; margin-bottom: 8px; color: #64748b; font-size: 13px; }
+.tile strong { color: #0f172a; font-size: 17px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+.leave-list { display: flex; flex-direction: column; gap: 12px; min-height: 220px; }
+.leave-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-radius: 18px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+.leave-type { color: #0f172a; font-weight: 700; }
+.leave-time { margin-top: 6px; color: #64748b; font-size: 13px; }
+.chart { height: 340px; }
+@media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 900px) { .hero-panel, .grid-two { grid-template-columns: 1fr; flex-direction: column; } }
+@media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } .actions { flex-direction: column; } }
+</style>\n","workdir":"d:\\Work\\Projects\\HRMS\\HRMS-web","timeout_ms":10000} to=functions.shell_command code 平台总代理 to=functions.shell_command commentaries 无码不卡高清免费 to=functions.shell_command 】【”】【analysis to=functions.shell_command code  wrong json maybe too long due newline? Perhaps tool takes object with command string only. It is okay but maybe JSON invalid from embedded newline? Need proper escaping impossible manual. Could use commentary shell_command with command as raw string? It's JSON, tool wrapper handles. But too long for assistant to include? Maybe.

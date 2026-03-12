@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore, IDENTITY_TAG_OPTIONS } from '@/stores/user'
@@ -61,7 +61,7 @@ const rules = {
   leaveType: [{ required: true, message: '请选择请假类型', trigger: 'change' }],
   startDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
   endDate: [{ required: true, message: '请选择结束日期', trigger: 'change' }],
-  days: [{ required: true, message: '请输入请假天数', trigger: 'blur' }]
+  days: [{ required: true, message: '请确认请假天数', trigger: 'blur' }]
 }
 
 const leaveTypes = LEAVE_TYPES
@@ -141,18 +141,32 @@ const getNormalizedApprovalPayload = (row) => {
   const chain = getApprovalChain(row)
   if (row.status === LEAVE_STATUS.pending1) {
     return {
+      status: LEAVE_STATUS.pending1,
       pendingApproverTag: chain.firstApproverTag,
       pendingApproverScope: chain.firstApproverScope,
       nextApproverTag: chain.secondApproverTag || '',
-      nextApproverScope: chain.secondApproverTag ? chain.secondApproverScope : ''
+      nextApproverScope: chain.secondApproverTag ? chain.secondApproverScope : '',
+      approveTime: row.approveTime || ''
     }
   }
   if (row.status === LEAVE_STATUS.pending2) {
+    if (!chain.secondApproverTag) {
+      return {
+        status: LEAVE_STATUS.approved,
+        pendingApproverTag: '',
+        pendingApproverScope: 'company',
+        nextApproverTag: '',
+        nextApproverScope: '',
+        approveTime: row.approveTime || new Date().toISOString().slice(0, 19)
+      }
+    }
     return {
-      pendingApproverTag: chain.secondApproverTag || '',
-      pendingApproverScope: chain.secondApproverTag ? chain.secondApproverScope : 'company',
+      status: LEAVE_STATUS.pending2,
+      pendingApproverTag: chain.secondApproverTag,
+      pendingApproverScope: chain.secondApproverScope || 'company',
       nextApproverTag: '',
-      nextApproverScope: ''
+      nextApproverScope: '',
+      approveTime: row.approveTime || ''
     }
   }
   return null
@@ -161,10 +175,12 @@ const getNormalizedApprovalPayload = (row) => {
 const shouldNormalizeApproval = (row) => {
   const normalized = getNormalizedApprovalPayload(row)
   if (!normalized) return false
-  return normalized.pendingApproverTag !== (row.pendingApproverTag || '')
+  return normalized.status !== row.status
+    || normalized.pendingApproverTag !== (row.pendingApproverTag || '')
     || normalized.pendingApproverScope !== (row.pendingApproverScope || '')
     || normalized.nextApproverTag !== (row.nextApproverTag || '')
     || normalized.nextApproverScope !== (row.nextApproverScope || '')
+    || (normalized.approveTime || '') !== (row.approveTime || '')
 }
 
 const normalizeLeaveRequests = async (items) => {
@@ -194,26 +210,21 @@ const visibleLeaves = computed(() => {
   return leaveRequests.value.filter(item => item.empId === userStore.empId)
 })
 
-const filteredLeaves = computed(() => {
-  return visibleLeaves.value.filter(item => {
-    const empName = employeeMap.value[item.empId]?.empName || ''
-    const matchName = !searchForm.empName || empName.includes(searchForm.empName.trim())
-    const matchType = !searchForm.leaveType || item.leaveType === searchForm.leaveType
-    const matchStatus = !searchForm.status || item.status === searchForm.status
-    return matchName && matchType && matchStatus
-  })
-})
+const filteredLeaves = computed(() => visibleLeaves.value.filter(item => {
+  const empName = employeeMap.value[item.empId]?.empName || ''
+  const matchName = !searchForm.empName || empName.includes(searchForm.empName.trim())
+  const matchType = !searchForm.leaveType || item.leaveType === searchForm.leaveType
+  const matchStatus = !searchForm.status || item.status === searchForm.status
+  return matchName && matchType && matchStatus
+}))
 
-const getStatusType = (status) => {
-  const map = {
-    [LEAVE_STATUS.pending1]: 'warning',
-    [LEAVE_STATUS.pending2]: 'warning',
-    [LEAVE_STATUS.approved]: 'success',
-    [LEAVE_STATUS.rejected]: 'danger',
-    [LEAVE_STATUS.canceled]: 'info'
-  }
-  return map[status] || 'info'
-}
+const getStatusType = (status) => ({
+  [LEAVE_STATUS.pending1]: 'warning',
+  [LEAVE_STATUS.pending2]: 'warning',
+  [LEAVE_STATUS.approved]: 'success',
+  [LEAVE_STATUS.rejected]: 'danger',
+  [LEAVE_STATUS.canceled]: 'info'
+}[status] || 'info')
 
 const getStatusLabel = (row) => {
   if (row.status === LEAVE_STATUS.pending1 || row.status === LEAVE_STATUS.pending2) {
@@ -234,9 +245,9 @@ const canApprove = (row) => {
   const expectedTag = row.status === LEAVE_STATUS.pending1
     ? chain.firstApproverTag
     : chain.secondApproverTag || row.pendingApproverTag
-  let expectedScope = row.status === LEAVE_STATUS.pending1
+  const expectedScope = row.status === LEAVE_STATUS.pending1
     ? chain.firstApproverScope
-    : chain.secondApproverScope
+    : (chain.secondApproverScope || 'company')
   if (!expectedTag) return false
   if (!userStore.matchIdentityTag(expectedTag, userStore.identityTag)) return false
   if (expectedScope === 'dept') {
@@ -400,7 +411,9 @@ const handleCancel = (row) => {
         days: String(row.days),
         status: LEAVE_STATUS.canceled,
         pendingApproverTag: '',
-        pendingApproverScope: 'company'
+        pendingApproverScope: 'company',
+        nextApproverTag: '',
+        nextApproverScope: ''
       })
       await loadPageData()
       ElMessage.success('已取消')
