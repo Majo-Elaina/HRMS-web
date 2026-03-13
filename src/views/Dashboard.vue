@@ -7,7 +7,7 @@ import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { ElMessage } from 'element-plus'
-import { IDENTITY_TAG_OPTIONS, useUserStore } from '@/stores/user'
+import { useUserStore } from '@/stores/user'
 import { listApprovalRulesApi } from '@/api/approvalRule'
 import { listAttendanceApi, createAttendanceApi, updateAttendanceApi } from '@/api/attendance'
 import { listDepartmentsApi } from '@/api/department'
@@ -61,10 +61,17 @@ const leaveRules = {
 
 const today = computed(() => new Date().toISOString().slice(0, 10))
 const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
-const tagLabelMap = IDENTITY_TAG_OPTIONS.reduce((acc, item) => {
-  acc[item.value] = item.label
-  return acc
-}, {})
+
+const roleLabelMap = {
+  'ADMIN': '系统管理员',
+  'HR': 'HR专员',
+  'MANAGER': '部门经理',
+  'EMPLOYEE': '普通员工',
+  'FINANCE_MANAGER': '财务经理',
+  'FINANCE': '财务专员',
+  'HR_MANAGER': 'HR经理',
+  'GENERAL_MANAGER': '总经理'
+}
 
 const currentEmployee = computed(() => employees.value.find(item => item.empId === userStore.empId) || null)
 
@@ -265,7 +272,10 @@ const pendingLeaves = computed(() => {
         : { tag: chain.secondApproverTag || item.pendingApproverTag, scope: chain.secondApproverScope || 'company' }
 
       if (!pending.tag) return false
-      if (!userStore.matchIdentityTag(pending.tag, userStore.identityTag)) return false
+      
+      // 检查当前用户的角色是否匹配期望的审批角色
+      if (pending.tag !== userStore.user?.roleCode) return false
+      
       if (pending.scope === 'dept') return emp?.deptId === userStore.deptId
       if (pending.scope === 'self') return item.empId === userStore.empId
       return true
@@ -278,7 +288,7 @@ const getLeaveStatusLabel = (row) => {
     const currentTag = row.status === LEAVE_STATUS.pending1
       ? chain.firstApproverTag
       : chain.secondApproverTag || row.pendingApproverTag
-    const tagLabel = currentTag ? (tagLabelMap[currentTag] || currentTag) : ''
+    const tagLabel = currentTag ? (roleLabelMap[currentTag] || currentTag) : ''
     return tagLabel ? `待 ${tagLabel} 审批` : row.status
   }
   return row.status
@@ -293,7 +303,7 @@ watch(
 
 const getNowTime = () => {
   const now = new Date()
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
 }
 
 const loadPageData = async () => {
@@ -409,7 +419,7 @@ const handleSubmitLeave = async () => {
       days: String(leaveForm.days),
       reason: leaveForm.reason,
       status: LEAVE_STATUS.pending1,
-      pendingApproverTag: rule?.firstApproverTag || 'ADMIN',
+      pendingApproverTag: rule?.firstApproverTag || 'HR',
       pendingApproverScope: 'company',
       nextApproverTag: rule?.secondApproverTag || '',
       nextApproverScope: rule?.secondApproverScope || 'dept',
@@ -483,7 +493,11 @@ onMounted(loadPageData)
             </div>
             <div class="tile">
               <span>当前状态</span>
-              <el-tag :type="attendanceTagType">{{ personalAttendance?.status || '未生成记录' }}</el-tag>
+              <div class="status-wrapper">
+                <el-tag :type="attendanceTagType" size="large" effect="dark" round>
+                  {{ personalAttendance?.status || (personalAttendance?.clockIn ? '已签到' : '未签到') }}
+                </el-tag>
+              </div>
             </div>
           </div>
 
@@ -537,46 +551,6 @@ onMounted(loadPageData)
       <el-col :xs="24" :xl="12">
         <el-card shadow="hover">
           <v-chart class="chart" :option="attendanceChartOption" autoresize />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" class="content-row">
-      <el-col :xs="24" :xl="12">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>待处理请假</span>
-              <el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button>
-            </div>
-          </template>
-
-          <el-table :data="pendingLeaves" size="small" max-height="300">
-            <el-table-column label="申请人">
-              <template #default="{ row }">{{ employeeMap[row.empId]?.empName || '-' }}</template>
-            </el-table-column>
-            <el-table-column prop="leaveType" label="类型" width="90" />
-            <el-table-column prop="days" label="天数" width="80" />
-            <el-table-column label="状态" min-width="150">
-              <template #default="{ row }">{{ getLeaveStatusLabel(row) }}</template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-
-      <el-col :xs="24" :xl="12">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <span>近期薪资记录</span>
-            </div>
-          </template>
-
-          <el-table :data="salaryRecords.slice(0, 6)" size="small" max-height="300">
-            <el-table-column prop="salaryMonth" label="月份" width="110" />
-            <el-table-column prop="netSalary" label="实发工资" />
-            <el-table-column prop="status" label="状态" width="110" />
-          </el-table>
         </el-card>
       </el-col>
     </el-row>
@@ -750,6 +724,21 @@ onMounted(loadPageData)
 .tile strong {
   color: #0f172a;
   font-size: 17px;
+}
+
+.status-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.status-wrapper .el-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 12px;
 }
 
 .actions {

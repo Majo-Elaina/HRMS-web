@@ -199,97 +199,212 @@ onMounted(loadPageData)
 
 <template>
   <div class="employee-page" v-loading="loading">
-    <el-card shadow="never" class="search-card">
-      <el-form :model="searchForm" inline>
-        <el-form-item label="关键字">
-          <el-input
-            v-model="searchForm.keyword"
-            placeholder="姓名/手机号/邮箱"
-            clearable
-            style="width: 220px"
-          />
-        </el-form-item>
-        <el-form-item label="部门">
-          <el-select v-model="searchForm.deptId" placeholder="请选择" clearable style="width: 150px">
-            <el-option
-              v-for="dept in visibleDepartments"
-              :key="dept.deptId"
-              :label="dept.deptName"
-              :value="dept.deptId"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
-            <el-option label="在职" value="在职" />
-            <el-option label="离职" value="离职" />
-            <el-option label="试用" value="试用" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>员工列表</span>
-          <el-button v-if="canAddEmployee" type="primary" @click="handleAdd">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-info">
+          <h1 class="page-title">员工管理</h1>
+          <p class="page-description">管理企业员工信息，包括基本资料、部门职位分配和状态维护</p>
+        </div>
+        <div class="header-actions">
+          <el-button v-if="canAddEmployee" type="primary" size="large" @click="handleAdd">
             <el-icon><Plus /></el-icon>
             新增员工
           </el-button>
         </div>
-      </template>
+      </div>
+    </div>
 
-      <el-table :data="filteredEmployees" stripe border>
-        <el-table-column prop="empId" label="员工编号" width="100" align="center" />
-        <el-table-column prop="empName" label="姓名" width="110" />
-        <el-table-column prop="gender" label="性别" width="80" align="center" />
-        <el-table-column prop="phone" label="联系电话" width="140" />
-        <el-table-column prop="email" label="邮箱" min-width="180" />
-        <el-table-column label="部门" width="130">
-          <template #default="{ row }">{{ getDeptName(row.deptId) }}</template>
-        </el-table-column>
-        <el-table-column label="职位" width="130">
-          <template #default="{ row }">{{ getPositionName(row.positionId) }}</template>
-        </el-table-column>
-        <el-table-column prop="hireDate" label="入职日期" width="120" />
-        <el-table-column prop="status" label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.status === '在职' ? 'success' : row.status === '试用' ? 'warning' : 'info'">
-              {{ row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <el-button v-if="canEditEmployee" type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="canDeleteEmployee" type="danger" link @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon total">
+          <el-icon><User /></el-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ filteredEmployees.length }}</div>
+          <div class="stat-label">员工总数</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon active">
+          <el-icon><Check /></el-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ filteredEmployees.filter(e => e.status === '在职').length }}</div>
+          <div class="stat-label">在职员工</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon trial">
+          <el-icon><Clock /></el-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ filteredEmployees.filter(e => e.status === '试用').length }}</div>
+          <div class="stat-label">试用期员工</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon departments">
+          <el-icon><OfficeBuilding /></el-icon>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ visibleDepartments.length }}</div>
+          <div class="stat-label">部门数量</div>
+        </div>
+      </div>
+    </div>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" destroy-on-close>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
+    <!-- 搜索区域 -->
+    <div class="main-content">
+      <el-card shadow="never" class="search-card">
+        <template #header>
+          <div class="search-header">
+            <el-icon class="search-icon"><Search /></el-icon>
+            <span class="search-title">筛选条件</span>
+          </div>
+        </template>
+        <el-form :model="searchForm" inline class="search-form">
+          <el-form-item label="关键字">
+            <el-input
+              v-model="searchForm.keyword"
+              placeholder="姓名/手机号/邮箱"
+              clearable
+              style="width: 220px"
+              prefix-icon="Search"
+            />
+          </el-form-item>
+          <el-form-item label="部门">
+            <el-select v-model="searchForm.deptId" placeholder="请选择" clearable style="width: 150px">
+              <el-option
+                v-for="dept in visibleDepartments"
+                :key="dept.deptId"
+                :label="dept.deptName"
+                :value="dept.deptId"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 120px">
+              <el-option label="在职" value="在职" />
+              <el-option label="离职" value="离职" />
+              <el-option label="试用" value="试用" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" size="large">
+              <el-icon><Search /></el-icon>
+              搜索
+            </el-button>
+            <el-button size="large" @click="handleReset">
+              <el-icon><Refresh /></el-icon>
+              重置
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
+
+      <!-- 员工列表 -->
+      <el-card shadow="never" class="table-card">
+        <template #header>
+          <div class="table-header">
+            <div class="header-left">
+              <el-icon class="header-icon"><UserFilled /></el-icon>
+              <span class="header-title">员工列表</span>
+            </div>
+            <div class="header-right">
+              <el-tag type="info" size="small">共 {{ filteredEmployees.length }} 名员工</el-tag>
+            </div>
+          </div>
+        </template>
+
+        <el-table :data="filteredEmployees" class="employee-table" size="large">
+          <el-table-column prop="empId" label="ID" width="80" align="center">
+            <template #default="{ row }">
+              <div class="emp-id">#{{ row.empId }}</div>
+            </template>
+          </el-table-column>
+          
+          <el-table-column label="员工信息" width="200">
+            <template #default="{ row }">
+              <div class="employee-info">
+                <div class="emp-avatar">
+                  <el-avatar :size="40" icon="UserFilled" />
+                </div>
+                <div class="emp-details">
+                  <div class="emp-name">{{ row.empName }}</div>
+                  <div class="emp-meta">{{ row.gender }} · {{ row.phone }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="部门职位" width="280">
+            <template #default="{ row }">
+              <div class="dept-position">
+                <div class="dept-info">
+                  <el-icon class="dept-icon"><OfficeBuilding /></el-icon>
+                  <span>{{ getDeptName(row.deptId) }}</span>
+                </div>
+                <div class="position-info">
+                  <el-icon class="position-icon"><Briefcase /></el-icon>
+                  <span>{{ getPositionName(row.positionId) }}</span>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="email" label="邮箱" min-width="180" />
+          
+          <el-table-column prop="hireDate" label="入职日期" width="120" align="center">
+            <template #default="{ row }">
+              <div class="hire-date">{{ row.hireDate }}</div>
+            </template>
+          </el-table-column>
+          
+          <el-table-column label="状态" width="100" align="center" class-name="status-column">
+            <template #default="{ row }">
+              <el-tag 
+                :type="row.status === '在职' ? 'success' : row.status === '试用' ? 'warning' : 'info'" 
+                size="large"
+                effect="dark"
+                round
+              >
+                {{ row.status }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          
+          <el-table-column label="操作" width="160" fixed="right" align="center" class-name="action-column">
+            <template #default="{ row }">
+              <div class="action-buttons">
+                <el-button v-if="canEditEmployee" type="primary" link size="small" @click="handleEdit(row)">
+                  <el-icon><Edit /></el-icon>
+                  编辑
+                </el-button>
+                <el-button v-if="canDeleteEmployee" type="danger" link size="small" @click="handleDelete(row)">
+                  <el-icon><Delete /></el-icon>
+                  删除
+                </el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </div>
+
+    <!-- 新增/编辑对话框 -->
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="700px" destroy-on-close class="employee-dialog">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px" class="employee-form">
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="姓名" prop="empName">
-              <el-input v-model="form.empName" placeholder="请输入姓名" />
+              <el-input v-model="form.empName" placeholder="请输入姓名" size="large" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="性别" prop="gender">
-              <el-radio-group v-model="form.gender">
+              <el-radio-group v-model="form.gender" size="large">
                 <el-radio value="男">男</el-radio>
                 <el-radio value="女">女</el-radio>
               </el-radio-group>
@@ -299,19 +414,19 @@ onMounted(loadPageData)
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="联系电话" prop="phone">
-              <el-input v-model="form.phone" placeholder="请输入手机号" />
+              <el-input v-model="form.phone" placeholder="请输入手机号" size="large" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="邮箱" prop="email">
-              <el-input v-model="form.email" placeholder="请输入邮箱" />
+              <el-input v-model="form.email" placeholder="请输入邮箱" size="large" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="部门" prop="deptId">
-              <el-select v-model="form.deptId" placeholder="请选择部门" style="width: 100%" @change="form.positionId = ''">
+              <el-select v-model="form.deptId" placeholder="请选择部门" style="width: 100%" size="large" @change="form.positionId = ''">
                 <el-option
                   v-for="dept in visibleDepartments"
                   :key="dept.deptId"
@@ -323,7 +438,7 @@ onMounted(loadPageData)
           </el-col>
           <el-col :span="12">
             <el-form-item label="职位" prop="positionId">
-              <el-select v-model="form.positionId" placeholder="请选择职位" style="width: 100%">
+              <el-select v-model="form.positionId" placeholder="请选择职位" style="width: 100%" size="large">
                 <el-option
                   v-for="item in filteredPositions"
                   :key="item.positionId"
@@ -343,12 +458,13 @@ onMounted(loadPageData)
                 placeholder="选择日期"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
+                size="large"
               />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="状态" prop="status">
-              <el-select v-model="form.status" style="width: 100%">
+              <el-select v-model="form.status" style="width: 100%" size="large">
                 <el-option label="在职" value="在职" />
                 <el-option label="离职" value="离职" />
                 <el-option label="试用" value="试用" />
@@ -358,25 +474,373 @@ onMounted(loadPageData)
         </el-row>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
+        <div class="dialog-footer">
+          <el-button size="large" @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" size="large" @click="handleSubmit">确定</el-button>
+        </div>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style scoped>
-.search-card {
-  margin-bottom: 15px;
+.employee-page {
+  padding: 0;
+  background: #f8fafc;
+  min-height: 100vh;
 }
 
-.search-card :deep(.el-card__body) {
-  padding-bottom: 0;
+.page-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 32px;
+  margin-bottom: 24px;
+  border-radius: 0 0 24px 24px;
 }
 
-.card-header {
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header-info h1 {
+  margin: 0 0 8px 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.page-description {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin: 0 32px 24px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.stat-card {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: white;
+}
+
+.stat-icon.total {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.stat-icon.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.stat-icon.trial {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.stat-icon.departments {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.search-card {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+}
+
+.search-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.search-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.search-form {
+  padding: 8px 0;
+}
+
+.search-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.search-form :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.search-form :deep(.el-input__wrapper:hover) {
+  border-color: #667eea;
+}
+
+.search-form :deep(.el-input__wrapper.is-focus) {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.table-card {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.employee-table {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.employee-table :deep(.el-table__header) {
+  background: #f8fafc;
+}
+
+.employee-table :deep(.el-table__row) {
+  transition: all 0.2s ease;
+}
+
+.employee-table :deep(.el-table__row:hover) {
+  background: #f1f5f9;
+}
+
+.emp-id {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.employee-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emp-details {
+  flex: 1;
+}
+
+.emp-name {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.emp-meta {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.dept-position {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dept-info, .position-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.dept-icon {
+  color: #3b82f6;
+  font-size: 16px;
+}
+
+.position-icon {
+  color: #10b981;
+  font-size: 16px;
+}
+
+.hire-date {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.status-column {
+  border-right: 1px solid var(--el-table-border-color);
+}
+
+.action-column {
+  border-left: 1px solid var(--el-table-border-color);
+}
+
+.employee-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 24px;
+  margin: 0;
+}
+
+.employee-dialog :deep(.el-dialog__title) {
+  color: white;
+  font-weight: 600;
+}
+
+.employee-dialog :deep(.el-dialog__headerbtn .el-dialog__close) {
+  color: white;
+}
+
+.employee-form {
+  padding: 24px;
+}
+
+.employee-form :deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #374151;
+}
+
+.employee-form :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.employee-form :deep(.el-input__wrapper:hover) {
+  border-color: #667eea;
+}
+
+.employee-form :deep(.el-input__wrapper.is-focus) {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.dialog-footer {
+  padding: 0 24px 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .header-content {
+    flex-direction: column;
+    gap: 20px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    margin: 0 16px 24px;
+  }
+  
+  .main-content {
+    padding: 0 16px;
+  }
+  
+  .page-header {
+    padding: 24px 16px;
+  }
+  
+  .search-form {
+    flex-direction: column;
+  }
+  
+  .search-form :deep(.el-form-item) {
+    width: 100%;
+  }
 }
 </style>

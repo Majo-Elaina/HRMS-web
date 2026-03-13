@@ -1,7 +1,7 @@
 ﻿<script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useUserStore, IDENTITY_TAG_OPTIONS } from '@/stores/user'
+import { useUserStore } from '@/stores/user'
 import { listApprovalRulesApi } from '@/api/approvalRule'
 import { listDepartmentsApi } from '@/api/department'
 import { listEmployeesApi } from '@/api/employee'
@@ -30,10 +30,16 @@ const LEAVE_STATUS = {
   canceled: '已取消'
 }
 
-const tagLabelMap = IDENTITY_TAG_OPTIONS.reduce((acc, item) => {
-  acc[item.value] = item.label
-  return acc
-}, {})
+const roleLabelMap = {
+  'ADMIN': '系统管理员',
+  'HR': 'HR专员',
+  'MANAGER': '部门经理',
+  'EMPLOYEE': '普通员工',
+  'FINANCE_MANAGER': '财务经理',
+  'FINANCE': '财务专员',
+  'HR_MANAGER': 'HR经理',
+  'GENERAL_MANAGER': '总经理'
+}
 
 const searchForm = reactive({
   empName: '',
@@ -69,7 +75,7 @@ const statusOptions = Object.values(LEAVE_STATUS)
 const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
 const canAddLeave = computed(() => userStore.hasPermission('attendance:leave:add'))
 
-const getTagLabel = (tag) => tagLabelMap[tag] || ''
+const getTagLabel = (tag) => roleLabelMap[tag] || ''
 const getDeptName = (deptId) => departments.value.find(item => item.deptId === deptId)?.deptName || '-'
 const getPositionName = (positionId) => positions.value.find(item => item.positionId === positionId)?.positionName || '-'
 
@@ -89,11 +95,17 @@ const employeeMap = computed(() => employees.value.reduce((acc, item) => {
 
 const getEmployeeTag = (empId) => {
   const emp = employeeMap.value[empId]
+  // 优先使用数据库中的身份标签
+  if (emp?.identityTagCode) {
+    return emp.identityTagCode
+  }
+  
+  // 如果没有数据库身份标签，则使用推导逻辑
   const deptName = getDeptName(emp?.deptId)
   const positionName = getPositionName(emp?.positionId)
   const roleCode = positionName.includes('经理') ? 'MANAGER' : 'EMPLOYEE'
   return userStore.getIdentityTagByEmpId(empId, {
-    identityTag: emp?.identityTagCode || emp?.identityTag || '',
+    identityTag: emp?.identityTag || '',
     roleCode,
     deptName,
     positionName
@@ -233,6 +245,19 @@ const getStatusLabel = (row) => {
       ? chain.firstApproverTag
       : chain.secondApproverTag || row.pendingApproverTag
     const tagLabel = getTagLabel(currentTag)
+    
+    // 调试信息
+    console.log('审批状态调试:', {
+      申请人: employeeMap.value[row.empId]?.empName,
+      申请人标签: getEmployeeTag(row.empId),
+      当前状态: row.status,
+      期望审批者标签: currentTag,
+      当前用户标签: userStore.identityTag,
+      标签匹配: userStore.matchIdentityTag(currentTag, userStore.identityTag),
+      有审批权限: userStore.hasPermission('attendance:leave:approve'),
+      可以审批: canApprove(row)
+    })
+    
     return tagLabel ? `待 ${tagLabel} 审批` : row.status
   }
   return row.status
@@ -249,7 +274,10 @@ const canApprove = (row) => {
     ? chain.firstApproverScope
     : (chain.secondApproverScope || 'company')
   if (!expectedTag) return false
-  if (!userStore.matchIdentityTag(expectedTag, userStore.identityTag)) return false
+  
+  // 检查当前用户的角色是否匹配期望的审批角色
+  if (expectedTag !== userStore.user?.roleCode) return false
+  
   if (expectedScope === 'dept') {
     return employeeMap.value[row.empId]?.deptId === userStore.deptId
   }
@@ -322,7 +350,7 @@ const buildLeavePayload = () => {
     days: String(form.days),
     reason: form.reason,
     status: LEAVE_STATUS.pending1,
-    pendingApproverTag: rule?.firstApproverTag || 'ADMIN',
+    pendingApproverTag: rule?.firstApproverTag || 'HR',
     pendingApproverScope: 'company',
     nextApproverTag: rule?.secondApproverTag || '',
     nextApproverScope: rule?.secondApproverScope || 'dept',

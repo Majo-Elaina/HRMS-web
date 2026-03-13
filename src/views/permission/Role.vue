@@ -183,7 +183,25 @@ const handleSubmit = async () => {
   }
 }
 
-const savePermission = async () => {
+const handleSelectAll = () => {
+  const allIds = []
+  const collectIds = (nodes) => {
+    nodes.forEach(node => {
+      allIds.push(node.id)
+      if (node.children?.length) {
+        collectIds(node.children)
+      }
+    })
+  }
+  collectIds(permissionTree.value)
+  treeRef.value?.setCheckedKeys(allIds)
+}
+
+const handleUnselectAll = () => {
+  treeRef.value?.setCheckedKeys([])
+}
+
+const handlePermissionSave = async () => {
   const checkedKeys = treeRef.value?.getCheckedKeys?.() || []
 
   try {
@@ -258,6 +276,10 @@ onMounted(loadPageData)
     <el-dialog v-model="permDialogVisible" title="权限配置" width="560px">
       <div class="perm-header">
         <span>角色：{{ currentRole?.roleName }}</span>
+        <div class="perm-actions">
+          <el-button size="small" @click="handleSelectAll">全选</el-button>
+          <el-button size="small" @click="handleUnselectAll">取消全选</el-button>
+        </div>
       </div>
       <el-tree
         ref="treeRef"
@@ -271,7 +293,7 @@ onMounted(loadPageData)
       />
       <template #footer>
         <el-button @click="permDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="savePermission">保存</el-button>
+        <el-button type="primary" @click="handlePermissionSave">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -285,10 +307,18 @@ onMounted(loadPageData)
 }
 
 .perm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 15px;
   padding-bottom: 10px;
   border-bottom: 1px solid #eee;
   color: #606266;
+}
+
+.perm-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>
 

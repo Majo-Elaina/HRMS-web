@@ -365,12 +365,14 @@ onMounted(loadPageData)
         <el-table-column prop="payDate" label="发放日期" width="110">
           <template #default="{ row }">{{ row.payDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleDetail(row)">详情</el-button>
-            <el-button v-if="canEditSalary" type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="row.status === '待发放' && canDirectPay" type="success" link @click="handlePay(row)">直接发放</el-button>
-            <el-button v-if="row.status === '待审批' && canApproveSalary" type="warning" link @click="handleApprove(row)">审批通过</el-button>
+            <div class="action-buttons">
+              <el-button type="primary" link @click="handleDetail(row)">详情</el-button>
+              <el-button v-if="canEditSalary" type="primary" link @click="handleEdit(row)">编辑</el-button>
+              <el-button v-if="row.status === '待发放' && canDirectPay" type="success" link @click="handlePay(row)">直接发放</el-button>
+              <el-button v-if="row.status === '待审批' && canApproveSalary" type="warning" link @click="handleApprove(row)">审批通过</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -499,5 +501,11 @@ onMounted(loadPageData)
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
 }
 </style>

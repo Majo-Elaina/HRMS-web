@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { listIdentityTagsApi } from '@/api/identityTag'
 import { listModuleScopeConfigsApi, updateModuleScopeConfigApi } from '@/api/moduleScope'
 import { MODULE_SCOPE_OPTIONS, useUserStore } from '@/stores/user'
 
@@ -9,7 +8,16 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
-const tagOptions = ref([])
+const tagOptions = ref([
+  { tagCode: 'ADMIN', tagName: '管理员' },
+  { tagCode: 'GENERAL_MANAGER', tagName: '总经理' },
+  { tagCode: 'HR_MANAGER', tagName: 'HR经理' },
+  { tagCode: 'HR_SPECIALIST', tagName: 'HR专员' },
+  { tagCode: 'FINANCE_MANAGER', tagName: '财务经理' },
+  { tagCode: 'FINANCE_SPECIALIST', tagName: '财务专员' },
+  { tagCode: 'MANAGER', tagName: '部门经理' },
+  { tagCode: 'EMPLOYEE', tagName: '普通员工' }
+])
 const rows = ref([])
 const dialogVisible = ref(false)
 const currentModule = ref(null)
@@ -36,11 +44,7 @@ const getTagScopeSummary = (scopeConfig) => {
 const loadPageData = async () => {
   loading.value = true
   try {
-    const [identityTags, configs] = await Promise.all([
-      listIdentityTagsApi(),
-      listModuleScopeConfigsApi()
-    ])
-    tagOptions.value = identityTags || []
+    const configs = await listModuleScopeConfigsApi()
     rows.value = configs || []
   } catch (error) {
     ElMessage.error(error.message || '加载模块范围配置失败')

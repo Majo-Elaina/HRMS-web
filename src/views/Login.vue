@@ -152,8 +152,8 @@ onMounted(() => {
         </div>
         <div class="account-grid">
           <div class="account-item">
-            <strong>管理员</strong>
-            <span>admin / admin123</span>
+            <strong>总经理</strong>
+            <span>gm / 123456</span>
           </div>
           <div class="account-item">
             <strong>HR专员</strong>
@@ -178,6 +178,10 @@ onMounted(() => {
           <div class="account-item">
             <strong>普通员工</strong>
             <span>emp_zhou / 123456</span>
+          </div>
+          <div class="account-item">
+            <strong>开发人员</strong>
+            <span>yunyue / yunyue</span>
           </div>
         </div>
       </div>

@@ -22,7 +22,7 @@ const ALL_PERMISSIONS = [
   'salary:config:add', 'salary:config:edit', 'salary:config:submit', 'salary:config:approve',
   'permission', 'permission:user', 'permission:role',
   'permission:user:view', 'permission:role:view', 'permission:dept-template:view',
-  'permission:identity:view', 'permission:module-scope:view', 'permission:approval-rule:view',
+  'permission:module-scope:view', 'permission:approval-rule:view',
   'permission:user:add', 'permission:user:edit', 'permission:user:delete',
   'permission:role:add', 'permission:role:edit', 'permission:role:delete', 'permission:role:perm',
   'report', 'report:view'
@@ -83,18 +83,30 @@ const ROLE_PERMISSIONS = {
     'salary', 'salary:record', 'salary:record:view', 'salary:config', 'salary:config:view',
     'salary:record:add', 'salary:record:edit', 'salary:record:submit',
     'salary:config:add', 'salary:config:edit', 'salary:config:submit'
+  ],
+  GENERAL_MANAGER: [
+    'dashboard', 'dashboard:view', 'dashboard:ai', 'dashboard:ai:view',
+    'base', 'base:employee', 'base:department', 'base:position',
+    'base:employee:view', 'base:department:view', 'base:position:view',
+    'base:employee:add', 'base:employee:edit', 'base:employee:delete',
+    'base:department:add', 'base:department:edit', 'base:department:delete',
+    'base:position:add', 'base:position:edit', 'base:position:delete',
+    'attendance', 'attendance:record', 'attendance:leave',
+    'attendance:record:view', 'attendance:leave:view',
+    'attendance:record:add', 'attendance:record:edit',
+    'attendance:leave:add', 'attendance:leave:approve', 'attendance:leave:cancel',
+    'salary', 'salary:record', 'salary:config',
+    'salary:record:view', 'salary:config:view',
+    'salary:record:add', 'salary:record:edit', 'salary:record:submit', 'salary:record:approve', 'salary:record:pay',
+    'salary:config:add', 'salary:config:edit', 'salary:config:submit', 'salary:config:approve',
+    'permission', 'permission:user', 'permission:role',
+    'permission:user:view', 'permission:role:view', 'permission:dept-template:view',
+    'permission:module-scope:view', 'permission:approval-rule:view',
+    'permission:user:add', 'permission:user:edit', 'permission:user:delete',
+    'permission:role:add', 'permission:role:edit', 'permission:role:delete', 'permission:role:perm',
+    'report', 'report:view'
   ]
 }
-
-export const IDENTITY_TAG_OPTIONS = [
-  { value: 'ADMIN', label: 'Admin' },
-  { value: 'HR_MANAGER', label: 'HR Manager' },
-  { value: 'HR_SPECIALIST', label: 'HR Specialist' },
-  { value: 'FINANCE_MANAGER', label: 'Finance Manager' },
-  { value: 'FINANCE_SPECIALIST', label: 'Finance Specialist' },
-  { value: 'MANAGER', label: 'Manager' },
-  { value: 'EMPLOYEE', label: 'Employee' }
-]
 
 export const MODULE_SCOPE_OPTIONS = [
   { value: 'self', label: 'Self' },
@@ -107,6 +119,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       HR_SPECIALIST: 'company',
       HR_MANAGER: 'company',
       FINANCE_SPECIALIST: 'dept',
@@ -119,6 +132,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       HR_SPECIALIST: 'company',
       HR_MANAGER: 'company',
       FINANCE_SPECIALIST: 'dept',
@@ -131,6 +145,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       HR_SPECIALIST: 'company',
       HR_MANAGER: 'company',
       FINANCE_SPECIALIST: 'dept',
@@ -143,6 +158,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       HR_SPECIALIST: 'company',
       HR_MANAGER: 'company',
       MANAGER: 'dept',
@@ -153,6 +169,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       HR_SPECIALIST: 'company',
       HR_MANAGER: 'company',
       MANAGER: 'dept',
@@ -163,6 +180,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       FINANCE_SPECIALIST: 'company',
       FINANCE_MANAGER: 'company'
     }
@@ -171,6 +189,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'company',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       FINANCE_SPECIALIST: 'company',
       FINANCE_MANAGER: 'company'
     }
@@ -179,6 +198,7 @@ const DEFAULT_MODULE_SCOPES = {
     default: 'dept',
     tagScopes: {
       ADMIN: 'company',
+      GENERAL_MANAGER: 'company',
       HR_SPECIALIST: 'company',
       HR_MANAGER: 'company',
       FINANCE_SPECIALIST: 'company',
@@ -261,6 +281,7 @@ const DEFAULT_APPROVAL_RULES = {
 
 const resolveIdentityTag = ({ roleCode, deptName, positionName }) => {
   if (roleCode === 'ADMIN') return 'ADMIN'
+  if (roleCode === 'GENERAL_MANAGER') return 'GENERAL_MANAGER'
   if (deptName === '人力资源部') {
     return positionName?.includes('经理') ? 'HR_MANAGER' : 'HR_SPECIALIST'
   }
@@ -273,6 +294,7 @@ const resolveIdentityTag = ({ roleCode, deptName, positionName }) => {
 const getIdentityTagAliases = (tag) => {
   const aliasMap = {
     ADMIN: ['ADMIN'],
+    GENERAL_MANAGER: ['GENERAL_MANAGER', 'ADMIN'],
     HR_MANAGER: ['HR_MANAGER', 'MANAGER'],
     HR_SPECIALIST: ['HR_SPECIALIST', 'EMPLOYEE'],
     FINANCE_MANAGER: ['FINANCE_MANAGER', 'MANAGER'],
@@ -290,9 +312,11 @@ const matchIdentityTag = (expectedTag, actualTag) => {
 
 const getIdentityTagByEmpId = (empId, fallback) => {
   const storedTag = fallback?.identityTag
-  if (storedTag && !['EMPLOYEE', 'MANAGER'].includes(storedTag)) {
+  // 如果数据库中有明确的身份标签且不是通用标签，直接使用
+  if (storedTag && storedTag.trim() && !['EMPLOYEE', 'MANAGER'].includes(storedTag)) {
     return storedTag
   }
+  // 否则使用推导逻辑
   return resolveIdentityTag(fallback)
 }
 
@@ -451,14 +475,19 @@ export const useUserStore = defineStore('user', () => {
   }
 
   const persistUser = (profile) => {
+    // 优先使用数据库中的身份标签，如果没有则使用推导逻辑
+    const identityTag = profile.identityTag && profile.identityTag.trim() 
+      ? profile.identityTag 
+      : getIdentityTagByEmpId(profile.empId, {
+          identityTag: profile.identityTag,
+          roleCode: profile.roleCode,
+          deptName: profile.deptName,
+          positionName: profile.positionName
+        });
+        
     user.value = {
       ...normalizeUserProfile(profile),
-      identityTag: getIdentityTagByEmpId(profile.empId, {
-        identityTag: profile.identityTag,
-        roleCode: profile.roleCode,
-        deptName: profile.deptName,
-        positionName: profile.positionName
-      })
+      identityTag
     }
     localStorage.setItem('user', JSON.stringify(user.value))
   }

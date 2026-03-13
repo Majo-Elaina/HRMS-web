@@ -88,12 +88,6 @@ const router = createRouter({
           meta: { title: '部门权限', icon: 'Tickets', permission: 'permission:dept-template:view' }
         },
         {
-          path: 'permission/identity',
-          name: 'PermissionIdentity',
-          component: () => import('@/views/permission/Identity.vue'),
-          meta: { title: '身份标签', icon: 'UserFilled', permission: 'permission:identity:view' }
-        },
-        {
           path: 'permission/module-scope',
           name: 'PermissionModuleScope',
           component: () => import('@/views/permission/ModuleScope.vue'),
