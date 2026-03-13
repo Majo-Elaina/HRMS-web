@@ -7,7 +7,7 @@ import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from
 import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { ElMessage } from 'element-plus'
-import { useUserStore } from '@/stores/user'
+import { IDENTITY_TAG_OPTIONS, useUserStore } from '@/stores/user'
 import { listApprovalRulesApi } from '@/api/approvalRule'
 import { listAttendanceApi, createAttendanceApi, updateAttendanceApi } from '@/api/attendance'
 import { listDepartmentsApi } from '@/api/department'
@@ -17,20 +17,12 @@ import { listPositionsApi } from '@/api/position'
 import { getReportSummaryApi } from '@/api/report'
 import { listSalaryRecordsApi } from '@/api/salaryRecord'
 import { ATTENDANCE_STATUS, getAttendanceStatusType, resolveAttendanceStatus } from '@/utils/smartRemark'
+import { calculateLeaveDays, LEAVE_STATUS, LEAVE_TYPES } from '@/utils/agentAssistant'
 
 use([CanvasRenderer, PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
 const router = useRouter()
 const userStore = useUserStore()
-
-const LEAVE_TYPES = ['年假', '病假', '事假', '婚假', '产假', '陪产假', '丧假']
-const LEAVE_STATUS = {
-  pending1: '待审批',
-  pending2: '待二级审批',
-  approved: '已通过',
-  rejected: '已拒绝',
-  canceled: '已取消'
-}
 
 const loading = ref(false)
 const attendanceSubmitting = ref(false)
@@ -68,14 +60,88 @@ const leaveRules = {
 }
 
 const today = computed(() => new Date().toISOString().slice(0, 10))
-const currentEmployee = computed(() => employees.value.find(item => item.empId === userStore.empId) || null)
 const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
+const tagLabelMap = IDENTITY_TAG_OPTIONS.reduce((acc, item) => {
+  acc[item.value] = item.label
+  return acc
+}, {})
+
+const currentEmployee = computed(() => employees.value.find(item => item.empId === userStore.empId) || null)
+
+const personalAttendance = computed(() => {
+  return [...attendanceRecords.value]
+    .filter(item => item.empId === userStore.empId && item.attendanceDate === today.value)
+    .sort((a, b) => (b.attendanceId || 0) - (a.attendanceId || 0))[0] || null
+})
+
+const personalLeaveList = computed(() => {
+  return [...leaveRequests.value]
+    .filter(item => item.empId === userStore.empId)
+    .sort((a, b) => String(b.applyTime || '').localeCompare(String(a.applyTime || '')))
+    .slice(0, 5)
+})
+
+const canClockIn = computed(() => !!userStore.empId && !personalAttendance.value?.clockIn)
+const canClockOut = computed(() => !!userStore.empId && !!personalAttendance.value?.clockIn && !personalAttendance.value?.clockOut)
+const attendanceTagType = computed(() => getAttendanceStatusType(personalAttendance.value?.status))
+
+const metricCards = computed(() => [
+  { label: '员工总数', value: summary.value.totalEmployees, tone: 'blue' },
+  { label: '本月新入职', value: summary.value.newEmployeesThisMonth, tone: 'green' },
+  { label: '出勤率', value: `${summary.value.attendanceRate}%`, tone: 'amber' },
+  { label: '待审批请假', value: pendingLeaves.value.length, tone: 'red' }
+])
+
+const deptChartOption = computed(() => ({
+  title: { text: '部门人员分布', left: 'center' },
+  tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
+  legend: { orient: 'vertical', left: 'left', top: 'middle' },
+  series: [{ type: 'pie', radius: ['38%', '68%'], data: summary.value.departmentStats || [] }]
+}))
+
+const attendanceChartOption = computed(() => {
+  const keys = ['正常', '迟到', '早退', '缺勤', '加班']
+  const monthKeys = Array.from({ length: 6 }).map((_, index) => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - (5 - index))
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  })
+
+  const source = monthKeys.map((month) => {
+    const bucket = { month, 正常: 0, 迟到: 0, 早退: 0, 缺勤: 0, 加班: 0 }
+    attendanceRecords.value.forEach((item) => {
+      if (String(item.attendanceDate || '').slice(0, 7) !== month) return
+      const status = String(item.status || '')
+      if (status.includes(ATTENDANCE_STATUS.normal)) bucket.正常 += 1
+      if (status.includes(ATTENDANCE_STATUS.late)) bucket.迟到 += 1
+      if (status.includes(ATTENDANCE_STATUS.early)) bucket.早退 += 1
+      if (status.includes(ATTENDANCE_STATUS.absent)) bucket.缺勤 += 1
+      if (status.includes(ATTENDANCE_STATUS.overtime)) bucket.加班 += 1
+    })
+    return bucket
+  })
+
+  return {
+    title: { text: '月度考勤统计', left: 'center' },
+    tooltip: { trigger: 'axis' },
+    legend: { data: keys, bottom: 0 },
+    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    xAxis: { type: 'category', data: source.map(item => item.month) },
+    yAxis: { type: 'value', name: '人次' },
+    series: keys.map(key => ({ name: key, type: 'bar', stack: 'total', data: source.map(item => item[key]) }))
+  }
+})
+
+const employeeMap = computed(() => employees.value.reduce((acc, item) => {
+  acc[item.empId] = item
+  return acc
+}, {}))
 
 const getDeptName = (deptId) => departments.value.find(item => item.deptId === deptId)?.deptName || '-'
 const getPositionName = (positionId) => positions.value.find(item => item.positionId === positionId)?.positionName || '-'
 
 const getEmployeeTag = (empId) => {
-  const emp = employees.value.find(item => item.empId === empId)
+  const emp = employeeMap.value[empId]
   const deptName = getDeptName(emp?.deptId)
   const positionName = getPositionName(emp?.positionId)
   const roleCode = positionName.includes('经理') ? 'MANAGER' : 'EMPLOYEE'
@@ -171,105 +237,59 @@ const normalizeLeaveRequests = async (items) => {
   const pendingItems = (items || []).filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
   const corrections = pendingItems.filter(shouldNormalizeApproval)
   if (!corrections.length) return items || []
+
   await Promise.all(corrections.map((item) => {
     const normalized = getNormalizedApprovalPayload(item)
-    return updateLeaveRequestApi(item.leaveId, { ...item, ...normalized, days: String(item.days) })
+    return updateLeaveRequestApi(item.leaveId, {
+      ...item,
+      ...normalized,
+      days: String(item.days)
+    })
   }))
+
   const refreshed = await listLeaveRequestsApi({ page: 1, size: 500 })
   return refreshed.items || []
 }
-
-const personalAttendance = computed(() => {
-  return [...attendanceRecords.value]
-    .filter(item => item.empId === userStore.empId && item.attendanceDate === today.value)
-    .sort((a, b) => (b.attendanceId || 0) - (a.attendanceId || 0))[0] || null
-})
-
-const personalLeaveList = computed(() => {
-  return [...leaveRequests.value]
-    .filter(item => item.empId === userStore.empId)
-    .sort((a, b) => String(b.applyTime || '').localeCompare(String(a.applyTime || '')))
-    .slice(0, 5)
-})
 
 const pendingLeaves = computed(() => {
   return leaveRequests.value
     .filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
     .filter((item) => {
-      const emp = employees.value.find(empItem => empItem.empId === item.empId)
+      const emp = employeeMap.value[item.empId]
       if (leaveScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
       if (leaveScope.value === 'self' && item.empId !== userStore.empId) return false
+
+      const chain = getApprovalChain(item)
       const pending = item.status === LEAVE_STATUS.pending1
-        ? { tag: getApprovalChain(item).firstApproverTag, scope: 'company' }
-        : { tag: getApprovalChain(item).secondApproverTag || item.pendingApproverTag, scope: getApprovalChain(item).secondApproverScope || 'company' }
+        ? { tag: chain.firstApproverTag, scope: 'company' }
+        : { tag: chain.secondApproverTag || item.pendingApproverTag, scope: chain.secondApproverScope || 'company' }
+
       if (!pending.tag) return false
       if (!userStore.matchIdentityTag(pending.tag, userStore.identityTag)) return false
       if (pending.scope === 'dept') return emp?.deptId === userStore.deptId
+      if (pending.scope === 'self') return item.empId === userStore.empId
       return true
     })
 })
 
-const canClockIn = computed(() => !!userStore.empId && !personalAttendance.value?.clockIn)
-const canClockOut = computed(() => !!userStore.empId && !!personalAttendance.value?.clockIn && !personalAttendance.value?.clockOut)
-const attendanceTagType = computed(() => getAttendanceStatusType(personalAttendance.value?.status))
-
-const metricCards = computed(() => [
-  { label: '员工总数', value: summary.value.totalEmployees, icon: 'User', tone: 'blue' },
-  { label: '本月新入职', value: summary.value.newEmployeesThisMonth, icon: 'UserFilled', tone: 'green' },
-  { label: '出勤率', value: `${summary.value.attendanceRate}%`, icon: 'Clock', tone: 'amber' },
-  { label: '待审批请假', value: pendingLeaves.value.length, icon: 'Document', tone: 'red' }
-])
-
-const deptChartOption = computed(() => ({
-  title: { text: '部门人员分布', left: 'center' },
-  tooltip: { trigger: 'item', formatter: '{b}: {c}人 ({d}%)' },
-  legend: { orient: 'vertical', left: 'left', top: 'middle' },
-  series: [{ type: 'pie', radius: ['38%', '68%'], data: summary.value.departmentStats || [] }]
-}))
-
-const attendanceChartOption = computed(() => {
-  const keys = ['正常', '迟到', '早退', '缺勤', '加班']
-  const monthKeys = Array.from({ length: 6 }).map((_, index) => {
-    const date = new Date()
-    date.setMonth(date.getMonth() - (5 - index))
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-  })
-  const source = monthKeys.map((month) => {
-    const bucket = { month, 正常: 0, 迟到: 0, 早退: 0, 缺勤: 0, 加班: 0 }
-    attendanceRecords.value.forEach((item) => {
-      if (String(item.attendanceDate || '').slice(0, 7) !== month) return
-      const status = String(item.status || '')
-      if (status.includes(ATTENDANCE_STATUS.normal)) bucket.正常 += 1
-      if (status.includes(ATTENDANCE_STATUS.late)) bucket.迟到 += 1
-      if (status.includes(ATTENDANCE_STATUS.early)) bucket.早退 += 1
-      if (status.includes(ATTENDANCE_STATUS.absent)) bucket.缺勤 += 1
-      if (status.includes(ATTENDANCE_STATUS.overtime)) bucket.加班 += 1
-    })
-    return bucket
-  })
-  return {
-    title: { text: '月度考勤统计', left: 'center' },
-    tooltip: { trigger: 'axis' },
-    legend: { data: keys, bottom: 0 },
-    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-    xAxis: { type: 'category', data: source.map(item => item.month) },
-    yAxis: { type: 'value', name: '人次' },
-    series: keys.map((key) => ({ name: key, type: 'bar', stack: 'total', data: source.map(item => item[key]) }))
+const getLeaveStatusLabel = (row) => {
+  if (row.status === LEAVE_STATUS.pending1 || row.status === LEAVE_STATUS.pending2) {
+    const chain = getApprovalChain(row)
+    const currentTag = row.status === LEAVE_STATUS.pending1
+      ? chain.firstApproverTag
+      : chain.secondApproverTag || row.pendingApproverTag
+    const tagLabel = currentTag ? (tagLabelMap[currentTag] || currentTag) : ''
+    return tagLabel ? `待 ${tagLabel} 审批` : row.status
   }
-})
-
-const calculateLeaveDays = (startDate, endDate) => {
-  if (!startDate || !endDate) return 1
-  const start = new Date(`${startDate}T00:00:00`)
-  const end = new Date(`${endDate}T00:00:00`)
-  const diff = end.getTime() - start.getTime()
-  if (Number.isNaN(diff) || diff < 0) return 1
-  return Math.floor(diff / 86400000) + 1
+  return row.status
 }
 
-watch(() => [leaveForm.startDate, leaveForm.endDate], ([startDate, endDate]) => {
-  leaveForm.days = calculateLeaveDays(startDate, endDate)
-})
+watch(
+  () => [leaveForm.startDate, leaveForm.endDate],
+  ([startDate, endDate]) => {
+    leaveForm.days = calculateLeaveDays(startDate, endDate)
+  }
+)
 
 const getNowTime = () => {
   const now = new Date()
@@ -289,6 +309,7 @@ const loadPageData = async () => {
       listSalaryRecordsApi({ page: 1, size: 500 }),
       listApprovalRulesApi({ page: 1, size: 200, typeCode: 'leave' })
     ])
+
     summary.value = summaryData
     employees.value = employeePage.items || []
     departments.value = departmentPage.items || []
@@ -322,8 +343,11 @@ const handleClockIn = async () => {
       }),
       remark: existed?.remark || ''
     }
-    if (existed?.attendanceId) await updateAttendanceApi(existed.attendanceId, payload)
-    else await createAttendanceApi(payload)
+    if (existed?.attendanceId) {
+      await updateAttendanceApi(existed.attendanceId, payload)
+    } else {
+      await createAttendanceApi(payload)
+    }
     ElMessage.success('签到成功')
     await loadPageData()
   } catch (error) {
@@ -373,6 +397,7 @@ const handleSubmitLeave = async () => {
   if (!leaveFormRef.value) return
   const valid = await leaveFormRef.value.validate().catch(() => false)
   if (!valid) return
+
   leaveSubmitting.value = true
   try {
     const rule = getMatchedRule(userStore.empId, leaveForm.days)
@@ -409,11 +434,13 @@ onMounted(loadPageData)
       <div>
         <div class="eyebrow">企业人事管理系统</div>
         <h1>欢迎回来，{{ userStore.user?.empName }}</h1>
-        <p class="hero-desc">当前角色为 {{ userStore.user?.roleName }}，你可以在首页快速完成个人考勤与请假申请。</p>
+        <p class="hero-desc">
+          当前角色是 {{ userStore.user?.roleName }}，你可以在首页直接完成个人签到、请假申请，并查看待办审批与核心经营指标。
+        </p>
         <div class="hero-meta">
           <span>所属部门：{{ userStore.user?.deptName || '-' }}</span>
           <span>当前岗位：{{ userStore.user?.positionName || '-' }}</span>
-          <span>日期：{{ today }}</span>
+          <span>今日日期：{{ today }}</span>
         </div>
       </div>
       <div class="hero-actions">
@@ -423,7 +450,7 @@ onMounted(loadPageData)
     </section>
 
     <section class="metrics-grid">
-      <el-card v-for="item in metricCards" :key="item.label" shadow="hover">
+      <el-card v-for="item in metricCards" :key="item.label" shadow="hover" class="metric-card">
         <div class="metric">
           <div class="metric-label">{{ item.label }}</div>
           <div class="metric-value">{{ item.value }}</div>
@@ -434,33 +461,66 @@ onMounted(loadPageData)
     <el-row :gutter="20" class="content-row">
       <el-col :xs="24" :lg="12">
         <el-card shadow="hover">
-          <template #header><div class="card-header"><span>个人考勤</span><span class="pill">{{ today }}</span></div></template>
+          <template #header>
+            <div class="card-header">
+              <span>个人考勤</span>
+              <span class="pill">{{ today }}</span>
+            </div>
+          </template>
+
           <div class="grid-two">
-            <div class="tile"><span>员工</span><strong>{{ currentEmployee?.empName || userStore.user?.empName || '-' }}</strong></div>
-            <div class="tile"><span>签到时间</span><strong>{{ personalAttendance?.clockIn || '未签到' }}</strong></div>
-            <div class="tile"><span>签退时间</span><strong>{{ personalAttendance?.clockOut || '未签退' }}</strong></div>
-            <div class="tile"><span>当前状态</span><el-tag :type="attendanceTagType">{{ personalAttendance?.status || '未生成记录' }}</el-tag></div>
+            <div class="tile">
+              <span>员工</span>
+              <strong>{{ currentEmployee?.empName || userStore.user?.empName || '-' }}</strong>
+            </div>
+            <div class="tile">
+              <span>签到时间</span>
+              <strong>{{ personalAttendance?.clockIn || '未签到' }}</strong>
+            </div>
+            <div class="tile">
+              <span>签退时间</span>
+              <strong>{{ personalAttendance?.clockOut || '未签退' }}</strong>
+            </div>
+            <div class="tile">
+              <span>当前状态</span>
+              <el-tag :type="attendanceTagType">{{ personalAttendance?.status || '未生成记录' }}</el-tag>
+            </div>
           </div>
+
           <div class="actions">
-            <el-button type="primary" :loading="attendanceSubmitting" :disabled="!canClockIn" @click="handleClockIn">上班签到</el-button>
-            <el-button type="success" :loading="attendanceSubmitting" :disabled="!canClockOut" @click="handleClockOut">下班签退</el-button>
+            <el-button type="primary" :loading="attendanceSubmitting" :disabled="!canClockIn" @click="handleClockIn">
+              上班签到
+            </el-button>
+            <el-button type="success" :loading="attendanceSubmitting" :disabled="!canClockOut" @click="handleClockOut">
+              下班签退
+            </el-button>
             <el-button @click="router.push('/attendance/record')">查看考勤记录</el-button>
           </div>
         </el-card>
       </el-col>
+
       <el-col :xs="24" :lg="12">
         <el-card shadow="hover">
-          <template #header><div class="card-header"><span>个人请假申请</span><el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button></div></template>
+          <template #header>
+            <div class="card-header">
+              <span>个人请假申请</span>
+              <el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button>
+            </div>
+          </template>
+
           <div v-if="personalLeaveList.length" class="leave-list">
             <div v-for="item in personalLeaveList" :key="item.leaveId" class="leave-item">
               <div>
                 <div class="leave-type">{{ item.leaveType }}</div>
                 <div class="leave-time">{{ item.startDate }} 至 {{ item.endDate }}</div>
               </div>
-              <el-tag :type="item.status === LEAVE_STATUS.approved ? 'success' : item.status === LEAVE_STATUS.rejected ? 'danger' : 'warning'">{{ item.status }}</el-tag>
+              <el-tag :type="item.status === LEAVE_STATUS.approved ? 'success' : item.status === LEAVE_STATUS.rejected ? 'danger' : 'warning'">
+                {{ getLeaveStatusLabel(item) }}
+              </el-tag>
             </div>
           </div>
           <el-empty v-else description="暂无个人请假记录" :image-size="80" />
+
           <div class="actions">
             <el-button type="primary" @click="openLeaveDialog">发起请假申请</el-button>
           </div>
@@ -470,30 +530,48 @@ onMounted(loadPageData)
 
     <el-row :gutter="20" class="content-row">
       <el-col :xs="24" :xl="12">
-        <el-card shadow="hover"><v-chart class="chart" :option="deptChartOption" autoresize /></el-card>
+        <el-card shadow="hover">
+          <v-chart class="chart" :option="deptChartOption" autoresize />
+        </el-card>
       </el-col>
       <el-col :xs="24" :xl="12">
-        <el-card shadow="hover"><v-chart class="chart" :option="attendanceChartOption" autoresize /></el-card>
+        <el-card shadow="hover">
+          <v-chart class="chart" :option="attendanceChartOption" autoresize />
+        </el-card>
       </el-col>
     </el-row>
 
     <el-row :gutter="20" class="content-row">
       <el-col :xs="24" :xl="12">
         <el-card shadow="hover">
-          <template #header><div class="card-header"><span>待处理请假</span><el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button></div></template>
+          <template #header>
+            <div class="card-header">
+              <span>待处理请假</span>
+              <el-button type="primary" link @click="router.push('/attendance/leave')">查看全部</el-button>
+            </div>
+          </template>
+
           <el-table :data="pendingLeaves" size="small" max-height="300">
             <el-table-column label="申请人">
-              <template #default="{ row }">{{ employees.find(item => item.empId === row.empId)?.empName || '-' }}</template>
+              <template #default="{ row }">{{ employeeMap[row.empId]?.empName || '-' }}</template>
             </el-table-column>
-            <el-table-column prop="leaveType" label="类型" width="80" />
-            <el-table-column prop="days" label="天数" width="70" />
-            <el-table-column prop="status" label="状态" width="120" />
+            <el-table-column prop="leaveType" label="类型" width="90" />
+            <el-table-column prop="days" label="天数" width="80" />
+            <el-table-column label="状态" min-width="150">
+              <template #default="{ row }">{{ getLeaveStatusLabel(row) }}</template>
+            </el-table-column>
           </el-table>
         </el-card>
       </el-col>
+
       <el-col :xs="24" :xl="12">
         <el-card shadow="hover">
-          <template #header><div class="card-header"><span>近期薪资记录</span></div></template>
+          <template #header>
+            <div class="card-header">
+              <span>近期薪资记录</span>
+            </div>
+          </template>
+
           <el-table :data="salaryRecords.slice(0, 6)" size="small" max-height="300">
             <el-table-column prop="salaryMonth" label="月份" width="110" />
             <el-table-column prop="netSalary" label="实发工资" />
@@ -510,14 +588,26 @@ onMounted(loadPageData)
         </el-form-item>
         <el-form-item label="请假类型" prop="leaveType">
           <el-select v-model="leaveForm.leaveType" style="width: 100%">
-            <el-option v-for="item in leaveTypes" :key="item" :label="item" :value="item" />
+            <el-option v-for="item in LEAVE_TYPES" :key="item" :label="item" :value="item" />
           </el-select>
         </el-form-item>
         <el-form-item label="开始日期" prop="startDate">
-          <el-date-picker v-model="leaveForm.startDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择开始日期" style="width: 100%" />
+          <el-date-picker
+            v-model="leaveForm.startDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择开始日期"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="结束日期" prop="endDate">
-          <el-date-picker v-model="leaveForm.endDate" type="date" value-format="YYYY-MM-DD" placeholder="请选择结束日期" style="width: 100%" />
+          <el-date-picker
+            v-model="leaveForm.endDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择结束日期"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="请假天数">
           <el-input :model-value="`${leaveForm.days} 天`" readonly />
@@ -535,29 +625,199 @@ onMounted(loadPageData)
 </template>
 
 <style scoped>
-.hero-panel { display: flex; justify-content: space-between; gap: 24px; padding: 32px; margin-bottom: 22px; border-radius: 28px; color: #fff; background: linear-gradient(135deg, #0f3f85 0%, #145da0 38%, #127a72 100%); }
-.eyebrow { display: inline-flex; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.14); font-size: 12px; margin-bottom: 14px; }
-.hero-desc { margin: 16px 0 0; line-height: 1.75; color: rgba(255,255,255,.88); }
-.hero-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
-.hero-meta span, .pill { padding: 8px 12px; border-radius: 999px; background: rgba(255,255,255,.14); }
-.hero-actions { display: flex; gap: 14px; }
-.hero-btn { min-width: 138px; color: #fff; border-color: rgba(255,255,255,.36); background: rgba(255,255,255,.08); }
-.metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 20px; margin-bottom: 22px; }
-.metric-label { color: #64748b; font-size: 15px; }
-.metric-value { margin-top: 8px; font-size: 40px; font-weight: 800; color: #0f172a; }
-.content-row { margin-bottom: 22px; }
-.card-header { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
-.grid-two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; margin-bottom: 18px; }
-.tile { padding: 18px; border-radius: 18px; background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%); }
-.tile span { display: block; margin-bottom: 8px; color: #64748b; font-size: 13px; }
-.tile strong { color: #0f172a; font-size: 17px; }
-.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
-.leave-list { display: flex; flex-direction: column; gap: 12px; min-height: 220px; }
-.leave-item { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px; border-radius: 18px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
-.leave-type { color: #0f172a; font-weight: 700; }
-.leave-time { margin-top: 6px; color: #64748b; font-size: 13px; }
-.chart { height: 340px; }
-@media (max-width: 1200px) { .metrics-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-@media (max-width: 900px) { .hero-panel, .grid-two { grid-template-columns: 1fr; flex-direction: column; } }
-@media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } .actions { flex-direction: column; } }
-</style>\n","workdir":"d:\\Work\\Projects\\HRMS\\HRMS-web","timeout_ms":10000} to=functions.shell_command code 平台总代理 to=functions.shell_command commentaries 无码不卡高清免费 to=functions.shell_command 】【”】【analysis to=functions.shell_command code  wrong json maybe too long due newline? Perhaps tool takes object with command string only. It is okay but maybe JSON invalid from embedded newline? Need proper escaping impossible manual. Could use commentary shell_command with command as raw string? It's JSON, tool wrapper handles. But too long for assistant to include? Maybe.
+.hero-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 32px;
+  margin-bottom: 22px;
+  border-radius: 28px;
+  color: #fff;
+  background: linear-gradient(135deg, #0f3f85 0%, #145da0 38%, #127a72 100%);
+}
+
+.hero-panel h1 {
+  margin: 0;
+  font-size: 52px;
+  line-height: 1.06;
+}
+
+.eyebrow {
+  display: inline-flex;
+  padding: 6px 12px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.hero-desc {
+  max-width: 860px;
+  margin: 16px 0 0;
+  line-height: 1.75;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.hero-meta span,
+.pill {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.hero-btn {
+  min-width: 138px;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.metric-card {
+  min-height: 132px;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.metric-label {
+  color: #64748b;
+  font-size: 15px;
+}
+
+.metric-value {
+  margin-top: 8px;
+  font-size: 40px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.content-row {
+  margin-bottom: 22px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.tile {
+  padding: 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
+}
+
+.tile span {
+  display: block;
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.tile strong {
+  color: #0f172a;
+  font-size: 17px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.leave-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 220px;
+}
+
+.leave-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.leave-type {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.leave-time {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.chart {
+  height: 340px;
+}
+
+@media (max-width: 1200px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-panel {
+    flex-direction: column;
+  }
+
+  .hero-panel h1 {
+    font-size: 40px;
+  }
+
+  .grid-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+}
+</style>

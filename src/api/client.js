@@ -10,14 +10,14 @@ apiClient.interceptors.response.use(
     const body = response.data
     if (body && typeof body === 'object' && 'success' in body) {
       if (!body.success) {
-        return Promise.reject(new Error(body.message || 'Request failed'))
+        return Promise.reject(new Error(body.message || '请求失败'))
       }
       return body.data
     }
     return body
   },
   (error) => {
-    const message = error.response?.data?.message || error.message || 'Request failed'
+    const message = error.response?.data?.message || error.message || '请求失败'
     return Promise.reject(new Error(message))
   }
 )

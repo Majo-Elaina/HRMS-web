@@ -22,6 +22,12 @@ const router = createRouter({
           meta: { title: '首页', icon: 'HomeFilled', permission: 'dashboard:view' }
         },
         {
+          path: 'ai-assistant',
+          name: 'AiAssistant',
+          component: () => import('@/views/AiAssistant.vue'),
+          meta: { title: '亚托莉', icon: 'ChatDotRound', permission: 'dashboard:ai:view' }
+        },
+        {
           path: 'base/employee',
           name: 'Employee',
           component: () => import('@/views/base/Employee.vue'),

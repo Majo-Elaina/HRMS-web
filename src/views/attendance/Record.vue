@@ -212,10 +212,10 @@ onMounted(loadPageData)
           <template #default="{ row }">{{ employeeNameMap[row.empId] || '-' }}</template>
         </el-table-column>
         <el-table-column prop="attendanceDate" label="考勤日期" width="120" />
-        <el-table-column prop="clockIn" label="上班打卡" width="100">
+        <el-table-column prop="clockIn" label="上班打卡" width="110">
           <template #default="{ row }">{{ row.clockIn || '-' }}</template>
         </el-table-column>
-        <el-table-column prop="clockOut" label="下班打卡" width="100">
+        <el-table-column prop="clockOut" label="下班打卡" width="110">
           <template #default="{ row }">{{ row.clockOut || '-' }}</template>
         </el-table-column>
         <el-table-column prop="status" label="考勤状态" min-width="120" align="center">
@@ -243,10 +243,10 @@ onMounted(loadPageData)
           <el-date-picker v-model="form.attendanceDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
         </el-form-item>
         <el-form-item label="上班打卡" prop="clockIn">
-          <el-time-picker v-model="form.clockIn" placeholder="选择时间" format="HH:mm" value-format="HH:mm" style="width: 100%" />
+          <el-time-picker v-model="form.clockIn" placeholder="选择时间" format="HH:mm:ss" value-format="HH:mm:ss" style="width: 100%" />
         </el-form-item>
         <el-form-item label="下班打卡" prop="clockOut">
-          <el-time-picker v-model="form.clockOut" placeholder="选择时间" format="HH:mm" value-format="HH:mm" style="width: 100%" />
+          <el-time-picker v-model="form.clockOut" placeholder="选择时间" format="HH:mm:ss" value-format="HH:mm:ss" style="width: 100%" />
         </el-form-item>
         <el-form-item label="状态参考">
           <el-select v-model="form.status" style="width: 100%">

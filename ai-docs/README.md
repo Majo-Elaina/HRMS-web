@@ -11,6 +11,8 @@
 - `06-ai-agent-execution-guide.md`：AI agent 规划审批执行方案
 - `07-leave-approval-rules.md`：请假审批规则口径与数据库映射
 - `08-project-key-issues-retrospective.md`：项目重点问题与解决方案复盘
+- `09-homepage-ai-agent-mvp.md`：亚托莉聊天助手、模型接入与只读数据说明
+- `10-atri-chat-provider-roadmap.md`：亚托莉聊天功能的 provider 切换、部署与后续完善方案
 
 通用响应结构：
 ```json

@@ -6,7 +6,7 @@ import { listApprovalRuleTypesApi } from '@/api/approvalRuleType'
 import { listApprovalRulesApi } from '@/api/approvalRule'
 
 const ALL_PERMISSIONS = [
-  'dashboard', 'dashboard:view',
+  'dashboard', 'dashboard:view', 'dashboard:ai', 'dashboard:ai:view',
   'base', 'base:employee', 'base:department', 'base:position',
   'base:employee:view', 'base:department:view', 'base:position:view',
   'base:employee:add', 'base:employee:edit', 'base:employee:delete',
@@ -473,7 +473,7 @@ export const useUserStore = defineStore('user', () => {
       localStorage.setItem('token', token.value)
       return { success: true }
     } catch (error) {
-      return { success: false, message: error.message || 'login failed' }
+      return { success: false, message: error.message || '登录失败' }
     }
   }
 

@@ -7,6 +7,9 @@ USE `hrms_db`;
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS `agent_execution_log`;
+DROP TABLE IF EXISTS `agent_approval_record`;
+DROP TABLE IF EXISTS `agent_task`;
 DROP TABLE IF EXISTS `operation_log`;
 DROP TABLE IF EXISTS `role_permission`;
 DROP TABLE IF EXISTS `permission`;
@@ -248,6 +251,58 @@ CREATE TABLE `sys_user` (
     FOREIGN KEY (`emp_id`) REFERENCES `employee` (`emp_id`),
   CONSTRAINT `fk_sys_user_role`
     FOREIGN KEY (`role_id`) REFERENCES `role` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `agent_task` (
+  `task_id` INT NOT NULL AUTO_INCREMENT,
+  `user_id` INT NOT NULL,
+  `command_text` TEXT NOT NULL,
+  `intent` VARCHAR(100) NOT NULL,
+  `risk_level` VARCHAR(20) NOT NULL,
+  `status` VARCHAR(20) NOT NULL,
+  `provider_name` VARCHAR(100) NULL,
+  `requires_approval` TINYINT(1) NOT NULL DEFAULT 1,
+  `executable` TINYINT(1) NOT NULL DEFAULT 0,
+  `plan_json` TEXT NOT NULL,
+  `result_summary` VARCHAR(255) NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`task_id`),
+  KEY `idx_agent_task_user_id` (`user_id`),
+  KEY `idx_agent_task_status` (`status`),
+  KEY `idx_agent_task_create_time` (`create_time`),
+  CONSTRAINT `fk_agent_task_user`
+    FOREIGN KEY (`user_id`) REFERENCES `sys_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `agent_approval_record` (
+  `approval_id` INT NOT NULL AUTO_INCREMENT,
+  `task_id` INT NOT NULL,
+  `approver_user_id` INT NOT NULL,
+  `action` VARCHAR(20) NOT NULL,
+  `remark` VARCHAR(255) NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`approval_id`),
+  KEY `idx_agent_approval_task_id` (`task_id`),
+  KEY `idx_agent_approval_user_id` (`approver_user_id`),
+  CONSTRAINT `fk_agent_approval_task`
+    FOREIGN KEY (`task_id`) REFERENCES `agent_task` (`task_id`),
+  CONSTRAINT `fk_agent_approval_user`
+    FOREIGN KEY (`approver_user_id`) REFERENCES `sys_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `agent_execution_log` (
+  `log_id` INT NOT NULL AUTO_INCREMENT,
+  `task_id` INT NOT NULL,
+  `step_no` INT NOT NULL DEFAULT 0,
+  `log_level` VARCHAR(20) NOT NULL,
+  `message` VARCHAR(500) NOT NULL,
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`log_id`),
+  KEY `idx_agent_execution_task_id` (`task_id`),
+  KEY `idx_agent_execution_step_no` (`step_no`),
+  CONSTRAINT `fk_agent_execution_task`
+    FOREIGN KEY (`task_id`) REFERENCES `agent_task` (`task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `leave_request` (
@@ -506,6 +561,8 @@ INSERT INTO `salary_record` (`salary_id`, `emp_id`, `salary_month`, `base_salary
 INSERT INTO `permission` (`perm_id`, `perm_name`, `perm_code`, `perm_type`, `parent_id`, `path`, `icon`, `sort_order`, `create_time`) VALUES
   (1, '仪表盘', 'dashboard', 'MENU', NULL, '/dashboard', 'DataLine', 1, '2024-01-01 09:00:00'),
   (2, '仪表盘查看', 'dashboard:view', 'BUTTON', 1, NULL, NULL, 1, '2024-01-01 09:00:00'),
+  (61, '亚托莉', 'dashboard:ai', 'MENU', 1, '/ai-assistant', 'ChatDotRound', 2, '2024-01-01 09:00:00'),
+  (62, '亚托莉查看', 'dashboard:ai:view', 'BUTTON', 61, NULL, NULL, 1, '2024-01-01 09:00:00'),
   (3, '基础信息', 'base', 'MENU', NULL, '/base', 'Menu', 2, '2024-01-01 09:00:00'),
   (4, '员工管理', 'base:employee', 'MENU', 3, '/base/employee', 'User', 1, '2024-01-01 09:00:00'),
   (5, '部门管理', 'base:department', 'MENU', 3, '/base/department', 'OfficeBuilding', 2, '2024-01-01 09:00:00'),
@@ -612,3 +669,39 @@ UPDATE `employee` SET `identity_tag_code` = 'EMPLOYEE' WHERE `emp_id` IN (7, 8, 
 UPDATE `employee` SET `identity_tag_code` = 'HR_MANAGER' WHERE `emp_id` = 15;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- =====================================================
+-- AI聊天记录表
+-- =====================================================
+
+-- 亚托莉聊天记录表
+CREATE TABLE IF NOT EXISTS `ai_chat_message` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `user_id` BIGINT NOT NULL COMMENT '用户ID',
+  `role` VARCHAR(20) NOT NULL COMMENT '角色：user/assistant',
+  `content` TEXT NOT NULL COMMENT '消息内容',
+  `provider_name` VARCHAR(100) DEFAULT NULL COMMENT 'AI提供商名称',
+  `model_name` VARCHAR(100) DEFAULT NULL COMMENT '模型名称',
+  `used_system_data` TINYINT(1) DEFAULT 0 COMMENT '是否使用了系统数据',
+  `create_time` DATETIME NOT NULL COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI聊天记录表';
+
+-- 为管理员账号添加AI助手访问权限（如果不存在）
+INSERT IGNORE INTO `permission` (`perm_name`, `perm_code`, `parent_id`, `perm_type`, `sort_order`)
+VALUES ('AI助手', 'dashboard:ai', 1, 'menu', 2);
+
+INSERT IGNORE INTO `permission` (`perm_name`, `perm_code`, `parent_id`, `perm_type`, `sort_order`)
+SELECT 'AI助手查看', 'dashboard:ai:view', `perm_id`, 'button', 1
+FROM `permission`
+WHERE `perm_code` = 'dashboard:ai'
+LIMIT 1;
+
+-- 为所有角色添加AI助手权限（如果不存在）
+INSERT IGNORE INTO `role_permission` (`role_id`, `perm_id`)
+SELECT r.`role_id`, p.`perm_id`
+FROM `role` r
+CROSS JOIN `permission` p
+WHERE p.`perm_code` IN ('dashboard:ai', 'dashboard:ai:view');

@@ -13,6 +13,7 @@ const isCollapse = ref(false)
 const menuList = computed(() => {
   const allMenus = [
     { index: '/dashboard', title: '首页', icon: 'HomeFilled', permission: 'dashboard:view' },
+    { index: '/ai-assistant', title: '亚托莉', icon: 'ChatDotRound', permission: 'dashboard:ai:view' },
     {
       index: '/base',
       title: '基础信息管理',
@@ -88,8 +89,13 @@ const handleLogout = () => {
   <el-container class="layout-container">
     <el-aside :width="isCollapse ? '72px' : '240px'" class="aside">
       <div class="logo">
-        <el-icon size="26"><OfficeBuilding /></el-icon>
-        <span v-show="!isCollapse">企业人事管理系统</span>
+        <div class="logo-atri-text" v-show="!isCollapse">
+          <span class="atri-main">ATRI</span>
+          <span class="atri-sub">HRMS</span>
+        </div>
+        <div class="logo-atri-mini" v-show="isCollapse">
+          <span class="atri-mini">A</span>
+        </div>
       </div>
 
       <div class="menu-scroll">
@@ -136,6 +142,10 @@ const handleLogout = () => {
         </div>
 
         <div class="header-right">
+          <div class="atri-badge">
+            <span class="atri-badge-text">ATRI</span>
+            <span class="powered-text">Powered</span>
+          </div>
           <el-dropdown>
             <span class="user-info">
               <el-avatar :size="34" icon="UserFilled" />
@@ -156,7 +166,7 @@ const handleLogout = () => {
         </div>
       </el-header>
 
-      <el-main class="main">
+      <el-main :class="['main', { 'main-fullscreen': route.path === '/ai-assistant' }]">
         <router-view />
       </el-main>
     </el-container>
@@ -187,15 +197,58 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
   background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   white-space: nowrap;
   overflow: hidden;
+  padding: 0 16px;
+}
+
+.logo-atri-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.atri-main {
+  font-size: 24px;
+  font-weight: 900;
+  font-family: 'Arial Black', 'Helvetica', sans-serif;
+  background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.atri-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #90caf9;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+
+.logo-atri-mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.atri-mini {
+  font-size: 28px;
+  font-weight: 900;
+  font-family: 'Arial Black', 'Helvetica', sans-serif;
+  background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 50%, #90caf9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 1px;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
 }
 
 .menu-scroll {
@@ -306,6 +359,54 @@ const handleLogout = () => {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 16px;
+}
+
+.atri-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 25px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.atri-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+.atri-badge-text {
+  font-size: 14px;
+  font-weight: 900;
+  font-family: 'Arial Black', 'Helvetica', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 1px;
+}
+
+.powered-text {
+  font-size: 11px;
+  color: #667eea;
+  font-weight: 500;
+  opacity: 0.8;
 }
 
 .user-info {
@@ -331,5 +432,10 @@ const handleLogout = () => {
 .main {
   padding: 22px;
   overflow-y: auto;
+}
+
+.main-fullscreen {
+  padding: 0;
+  overflow: hidden;
 }
 </style>
