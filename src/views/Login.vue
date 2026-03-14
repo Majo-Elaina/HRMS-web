@@ -15,6 +15,8 @@ const loginForm = reactive({
 const loading = ref(false)
 const formRef = ref(null)
 const currentBgIndex = ref(0)
+const nextBgIndex = ref(1)
+const isTransitioning = ref(false)
 
 // 背景图片列表（排除竖屏的01）
 const backgroundImages = [
@@ -29,11 +31,20 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
-// 背景图片轮播
+// 背景图片轮播 - 更丝滑的过渡效果
 const rotateBackground = () => {
   setInterval(() => {
-    currentBgIndex.value = (currentBgIndex.value + 1) % backgroundImages.length
-  }, 8000) // 每8秒切换一次
+    isTransitioning.value = true
+    
+    // 预加载下一张图片
+    nextBgIndex.value = (currentBgIndex.value + 1) % backgroundImages.length
+    
+    // 延迟切换，确保过渡效果
+    setTimeout(() => {
+      currentBgIndex.value = nextBgIndex.value
+      isTransitioning.value = false
+    }, 100)
+  }, 6000) // 每6秒切换一次，给过渡更多时间
 }
 
 const handleLogin = async () => {
@@ -59,7 +70,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="login-container" :style="{ backgroundImage: `url(${backgroundImages[currentBgIndex]})` }">
+  <div class="login-container">
+    <!-- 背景图片层 -->
+    <div 
+      class="background-layer current-bg" 
+      :style="{ backgroundImage: `url(${backgroundImages[currentBgIndex]})` }"
+      :class="{ 'transitioning': isTransitioning }"
+    ></div>
+    <div 
+      class="background-layer next-bg" 
+      :style="{ backgroundImage: `url(${backgroundImages[nextBgIndex]})` }"
+      :class="{ 'transitioning': isTransitioning }"
+    ></div>
+    
     <!-- 背景遮罩 -->
     <div class="background-overlay"></div>
     
@@ -195,12 +218,39 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
+  padding: 0 5%;
+  overflow: hidden;
+}
+
+/* 背景图片层 - 实现丝滑过渡 */
+.background-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transition: background-image 1s ease-in-out;
-  position: relative;
-  padding: 0 5%;
+  transition: opacity 2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+.current-bg {
+  opacity: 1;
+}
+
+.current-bg.transitioning {
+  opacity: 0;
+}
+
+.next-bg {
+  opacity: 0;
+}
+
+.next-bg.transitioning {
+  opacity: 1;
 }
 
 .background-overlay {
@@ -221,6 +271,18 @@ onMounted(() => {
   max-width: 500px;
   z-index: 1;
   color: white;
+  animation: slideInFromLeft 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .atri-branding {
@@ -327,12 +389,79 @@ onMounted(() => {
 .login-box {
   width: 450px;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(240, 245, 255, 0.8) 30%,
+    rgba(235, 240, 255, 0.82) 70%,
+    rgba(245, 248, 255, 0.85) 100%);
   border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 20px rgba(102, 126, 234, 0.05);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   z-index: 1;
+  position: relative;
+  animation: slideInFromRight 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
+             floatSubtle 6s ease-in-out infinite 1s;
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes floatSubtle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+/* 为登录框添加更明显的内部光效和渐变 */
+.login-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    rgba(102, 126, 234, 0.08) 0%,
+    rgba(118, 75, 162, 0.06) 30%,
+    rgba(64, 158, 255, 0.05) 70%,
+    rgba(147, 197, 253, 0.08) 100%);
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.login-box::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(135deg, 
+    rgba(102, 126, 234, 0.2) 0%,
+    rgba(118, 75, 162, 0.15) 50%,
+    rgba(64, 158, 255, 0.2) 100%);
+  border-radius: 22px;
+  filter: blur(8px);
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: -2;
 }
 
 .login-header {
@@ -368,16 +497,18 @@ onMounted(() => {
 
 .login-header h2 {
   margin: 0 0 10px 0;
-  color: #2c3e50;
+  color: #1a202c;
   font-size: 24px;
   font-weight: 600;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 
 .welcome-text {
-  color: #7f8c8d;
+  color: #4a5568;
   font-size: 14px;
   margin: 0;
   line-height: 1.5;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
 }
 
 .login-form {
@@ -390,14 +521,32 @@ onMounted(() => {
 
 .login-input :deep(.el-input__wrapper) {
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e1e8ed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(200, 210, 240, 0.6);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(240, 245, 255, 0.75) 50%,
+    rgba(235, 240, 255, 0.8) 100%);
+  backdrop-filter: blur(15px);
   transition: all 0.3s ease;
 }
 
 .login-input :deep(.el-input__wrapper:hover) {
-  border-color: #409eff;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+  border-color: rgba(102, 126, 234, 0.5);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(240, 245, 255, 0.85) 50%,
+    rgba(235, 240, 255, 0.9) 100%);
+}
+
+.login-input :deep(.el-input__wrapper.is-focus) {
+  border-color: rgba(102, 126, 234, 0.7);
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.25);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(240, 245, 255, 0.9) 50%,
+    rgba(235, 240, 255, 0.95) 100%);
 }
 
 .login-btn {
@@ -417,10 +566,18 @@ onMounted(() => {
 }
 
 .login-tips {
-  background: #f8fafc;
+  background: linear-gradient(135deg, 
+    rgba(240, 245, 255, 0.7) 0%,
+    rgba(235, 240, 255, 0.75) 50%,
+    rgba(230, 235, 255, 0.8) 100%);
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(200, 210, 240, 0.5);
+  backdrop-filter: blur(15px);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 10px rgba(102, 126, 234, 0.03);
 }
 
 .tips-header {
@@ -428,9 +585,10 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 15px;
-  color: #4a5568;
+  color: #2d3748;
   font-weight: 600;
   font-size: 14px;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
 }
 
 .account-grid {
@@ -444,27 +602,39 @@ onMounted(() => {
   flex-direction: column;
   gap: 4px;
   padding: 10px;
-  background: white;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.8) 0%,
+    rgba(240, 245, 255, 0.75) 50%,
+    rgba(235, 240, 255, 0.8) 100%);
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(200, 210, 240, 0.4);
+  backdrop-filter: blur(10px);
   transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .account-item:hover {
-  border-color: #cbd5e0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(240, 245, 255, 0.85) 50%,
+    rgba(235, 240, 255, 0.9) 100%);
+  transform: translateY(-1px);
 }
 
 .account-item strong {
   font-size: 12px;
-  color: #2d3748;
+  color: #1a202c;
   font-weight: 600;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6);
 }
 
 .account-item span {
   font-size: 11px;
-  color: #718096;
+  color: #4a5568;
   font-family: 'Courier New', monospace;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.4);
 }
 
 /* 响应式设计 */
