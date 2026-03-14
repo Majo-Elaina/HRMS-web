@@ -37,3 +37,18 @@ __screenshots__/
 
 # docx
 *.docx
+
+# 调试和临时文件
+debug.html
+clear-storage.html
+fix-blank-page.ps1
+*.tmp
+*.bak
+*.old
+*~
+
+# Mock数据（已使用真实API）
+/src/mock/
+
+# 临时传输目录
+backend-transfer/

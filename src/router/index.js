@@ -117,21 +117,35 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
-  await userStore.restoreLogin()
+  
+  // 避免在登录页面时执行 restoreLogin，防止无限循环
+  if (to.path !== '/login') {
+    await userStore.restoreLogin()
+  }
 
-  if (to.meta.requiresAuth === false) {
-    if (userStore.isLoggedIn && to.path === '/login') {
+  // 如果是登录页面
+  if (to.path === '/login') {
+    if (userStore.isLoggedIn) {
       next('/dashboard')
     } else {
       next()
     }
-  } else if (!userStore.isLoggedIn) {
-    next('/login')
-  } else if (to.meta.permission && !userStore.hasPermission(to.meta.permission)) {
-    next('/dashboard')
-  } else {
-    next()
+    return
   }
+
+  // 如果用户未登录，重定向到登录页
+  if (!userStore.isLoggedIn) {
+    next('/login')
+    return
+  }
+
+  // 检查权限
+  if (to.meta.permission && !userStore.hasPermission(to.meta.permission)) {
+    next('/dashboard')
+    return
+  }
+
+  next()
 })
 
 export default router
