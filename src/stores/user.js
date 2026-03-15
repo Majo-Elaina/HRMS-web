@@ -234,7 +234,7 @@ const DEFAULT_LEAVE_APPROVAL_RULES = [
     daysOp: 'any',
     daysValue: 0,
     firstApproverTag: 'HR_MANAGER',
-    secondApproverTag: 'ADMIN',
+    secondApproverTag: 'GENERAL_MANAGER',
     secondApproverScope: 'company'
   },
   {
@@ -242,7 +242,25 @@ const DEFAULT_LEAVE_APPROVAL_RULES = [
     applicantTag: 'HR_MANAGER',
     daysOp: 'any',
     daysValue: 0,
-    firstApproverTag: 'ADMIN',
+    firstApproverTag: 'GENERAL_MANAGER',
+    secondApproverTag: '',
+    secondApproverScope: 'company'
+  },
+  {
+    id: 5,
+    applicantTag: 'ADMIN',
+    daysOp: 'any',
+    daysValue: 0,
+    firstApproverTag: 'GENERAL_MANAGER',
+    secondApproverTag: '',
+    secondApproverScope: 'company'
+  },
+  {
+    id: 6,
+    applicantTag: 'GENERAL_MANAGER',
+    daysOp: 'any',
+    daysValue: 0,
+    firstApproverTag: 'HR_MANAGER',
     secondApproverTag: '',
     secondApproverScope: 'company'
   }
@@ -388,7 +406,7 @@ const loadApprovalRules = () => {
 }
 
 const getRolePermissions = (roleCode) => {
-  if (roleCode === 'ADMIN') return [...ALL_PERMISSIONS]
+  if (roleCode === 'ADMIN' || roleCode === 'GENERAL_MANAGER') return [...ALL_PERMISSIONS]
   return ROLE_PERMISSIONS[roleCode] ? [...ROLE_PERMISSIONS[roleCode]] : []
 }
 
@@ -413,7 +431,7 @@ export const useUserStore = defineStore('user', () => {
   const deptName = computed(() => user.value?.deptName || '')
   const positionName = computed(() => user.value?.positionName || '')
 
-  const isAdmin = computed(() => roleCode.value === 'ADMIN')
+  const isAdmin = computed(() => roleCode.value === 'ADMIN' || roleCode.value === 'GENERAL_MANAGER')
   const identityTagAliases = computed(() => getIdentityTagAliases(identityTag.value))
 
   const hasIdentityTag = (tag) => matchIdentityTag(tag, identityTag.value)
@@ -575,7 +593,7 @@ export const useUserStore = defineStore('user', () => {
   // 检查权限
   function hasPermission(perm) {
     if (!user.value) return false
-    if (user.value.roleCode === 'ADMIN') return true
+    if (user.value.roleCode === 'ADMIN' || user.value.roleCode === 'GENERAL_MANAGER') return true
     if (permissions.value.includes(perm)) return true
     if (perm.endsWith(':view')) {
       const legacy = perm.replace(':view', '')

@@ -16,6 +16,11 @@
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+CREATE DATABASE IF NOT EXISTS hrms_db CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+
+
+-- 选择数据库
+USE hrms_db;
 
 -- ----------------------------
 -- Table structure for agent_approval_record
@@ -306,7 +311,7 @@ CREATE TABLE `employee`  (
 -- ----------------------------
 -- Records of employee
 -- ----------------------------
-INSERT INTO `employee` VALUES (1, '张伟', '男', '13800000001', 'zhangwei@company.com', '110101199001010011', '1990-01-01', '北京市海淀区', '2020-01-15', NULL, 1, 1, 'ADMIN', '在职', '2024-01-01 09:00:00', '2026-03-14 00:03:42');
+INSERT INTO `employee` VALUES (1, '张伟', '男', '13800000001', 'zhangwei@company.com', '110101199001010011', '1990-01-01', '北京市海淀区', '2020-01-15', NULL, 1, 1, 'GENERAL_MANAGER', '在职', '2024-01-01 09:00:00', '2026-03-14 00:03:42');
 INSERT INTO `employee` VALUES (2, '李娜', '女', '13800000002', 'lina@company.com', '110101199203120022', '1992-03-12', '北京市朝阳区', '2020-03-01', NULL, 2, 3, 'HR_SPECIALIST', '在职', '2024-01-01 09:00:00', '2026-03-14 00:03:42');
 INSERT INTO `employee` VALUES (3, '王芳', '女', '13800000003', 'wangfang@company.com', '110101199508080033', '1995-08-08', '北京市丰台区', '2021-06-15', NULL, 2, 3, 'HR_SPECIALIST', '在职', '2024-01-01 09:00:00', '2026-03-14 00:03:42');
 INSERT INTO `employee` VALUES (4, '刘强', '男', '13800000004', 'liuqiang@company.com', '110101198909210044', '1989-09-21', '北京市西城区', '2020-05-20', NULL, 3, 4, 'FINANCE_MANAGER', '在职', '2024-01-01 09:00:00', '2026-03-14 00:03:42');
