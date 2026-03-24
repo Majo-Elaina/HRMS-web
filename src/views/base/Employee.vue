@@ -362,7 +362,7 @@ onMounted(loadPageData)
             </template>
           </el-table-column>
           
-          <el-table-column label="状态" width="100" align="center" class-name="status-column">
+          <el-table-column label="状态" width="100" align="center" fixed="right" class-name="status-column">
             <template #default="{ row }">
               <el-tag 
                 :type="row.status === '在职' ? 'success' : row.status === '试用' ? 'warning' : 'info'" 

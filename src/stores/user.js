@@ -513,11 +513,18 @@ export const useUserStore = defineStore('user', () => {
   async function loginByApi(username, password) {
     try {
       const result = await loginApi({ username, password })
-      persistUser(result.user)
-      await hydrateRemoteConfigs()
+      
+      // 先存储Token到localStorage，确保后续请求可以使用
       token.value = result.token
-      restored.value = true
       localStorage.setItem('token', token.value)
+      
+      // 然后存储用户信息
+      persistUser(result.user)
+      
+      // 最后加载远程配置
+      await hydrateRemoteConfigs()
+      
+      restored.value = true
       return { success: true }
     } catch (error) {
       return { success: false, message: error.message || '登录失败' }

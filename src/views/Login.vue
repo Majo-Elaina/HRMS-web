@@ -157,13 +157,7 @@ onMounted(() => {
             class="login-btn"
             @click="handleLogin"
           >
-            <template v-if="loading">
-              <el-icon class="is-loading"><Loading /></el-icon>
-              亚托莉正在验证中...
-            </template>
-            <template v-else>
-              登录系统
-            </template>
+            {{ loading ? '亚托莉正在验证中...' : '登录系统' }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -390,17 +384,17 @@ onMounted(() => {
   width: 450px;
   padding: 40px;
   background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.85) 0%,
-    rgba(240, 245, 255, 0.8) 30%,
-    rgba(235, 240, 255, 0.82) 70%,
-    rgba(245, 248, 255, 0.85) 100%);
+    rgba(255, 255, 255, 0.75) 0%,
+    rgba(240, 245, 255, 0.7) 30%,
+    rgba(235, 240, 255, 0.72) 70%,
+    rgba(245, 248, 255, 0.75) 100%);
   border-radius: 20px;
   box-shadow: 
     0 20px 60px rgba(0, 0, 0, 0.3),
     0 0 0 1px rgba(255, 255, 255, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 20px rgba(102, 126, 234, 0.05);
-  backdrop-filter: blur(30px);
+  backdrop-filter: blur(15px);
   border: 1px solid rgba(255, 255, 255, 0.4);
   z-index: 1;
   position: relative;
@@ -524,10 +518,10 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(200, 210, 240, 0.6);
   background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(240, 245, 255, 0.75) 50%,
-    rgba(235, 240, 255, 0.8) 100%);
-  backdrop-filter: blur(15px);
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(240, 245, 255, 0.65) 50%,
+    rgba(235, 240, 255, 0.7) 100%);
+  backdrop-filter: blur(10px);
   transition: all 0.3s ease;
 }
 
@@ -535,18 +529,18 @@ onMounted(() => {
   border-color: rgba(102, 126, 234, 0.5);
   box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
   background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(240, 245, 255, 0.85) 50%,
-    rgba(235, 240, 255, 0.9) 100%);
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(240, 245, 255, 0.8) 50%,
+    rgba(235, 240, 255, 0.85) 100%);
 }
 
 .login-input :deep(.el-input__wrapper.is-focus) {
   border-color: rgba(102, 126, 234, 0.7);
   box-shadow: 0 4px 20px rgba(102, 126, 234, 0.25);
   background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(240, 245, 255, 0.9) 50%,
-    rgba(235, 240, 255, 0.95) 100%);
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(240, 245, 255, 0.85) 50%,
+    rgba(235, 240, 255, 0.9) 100%);
 }
 
 .login-btn {
@@ -672,5 +666,16 @@ onMounted(() => {
 .login-form {
   user-select: text;
   caret-color: auto;
+}
+
+/* 隐藏表单验证错误提示 */
+.login-form :deep(.el-form-item__error) {
+  display: none;
+}
+
+/* 验证失败时的输入框样式优化 */
+.login-form :deep(.el-form-item.is-error .el-input__wrapper) {
+  border-color: rgba(245, 108, 108, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.1) !important;
 }
 </style>

@@ -4,12 +4,14 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { listEmployeesApi } from '@/api/employee'
 import { createSalaryRecordApi, listSalaryRecordsApi, updateSalaryRecordApi } from '@/api/salaryRecord'
+import { listApprovalRulesApi } from '@/api/approvalRule'
 
 const userStore = useUserStore()
 
 const loading = ref(false)
 const salaryRecords = ref([])
 const employees = ref([])
+const approvalRules = ref([])
 const dialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const formRef = ref(null)
@@ -83,6 +85,46 @@ const formatMonthForView = (value) => (value ? String(value).slice(0, 7) : '')
 const formatMonthForApi = (value) => (value ? `${String(value).slice(0, 7)}-01` : null)
 const formatMoney = (val) => Number(val || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// 获取员工的身份标签
+const getEmployeeIdentityTag = (empId) => {
+  const emp = employees.value.find(e => e.empId === empId)
+  if (!emp) return 'EMPLOYEE'
+  
+  // 使用员工的identityTagCode，如果没有则推导
+  if (emp.identityTagCode) return emp.identityTagCode
+  
+  // 简单推导逻辑
+  return userStore.getIdentityTagByEmpId(empId, {
+    identityTag: emp.identityTagCode || '',
+    roleCode: emp.roleCode || 'EMPLOYEE',
+    deptName: emp.deptName || '',
+    positionName: emp.positionName || ''
+  })
+}
+
+// 匹配审批规则
+const matchApprovalRule = (empId) => {
+  const applicantTag = getEmployeeIdentityTag(empId)
+  
+  // 查找匹配的规则
+  const matchedRules = approvalRules.value.filter(rule => {
+    // 如果规则的申请人标签是*（任意），或者匹配当前员工的标签
+    if (rule.applicantTag === '*') return true
+    if (rule.applicantTag === applicantTag) return true
+    // 检查标签别名匹配
+    return userStore.matchIdentityTag(rule.applicantTag, applicantTag)
+  })
+  
+  // 按优先级排序：精确匹配 > 别名匹配 > 通配符
+  matchedRules.sort((a, b) => {
+    const aScore = a.applicantTag === applicantTag ? 2 : (a.applicantTag === '*' ? 0 : 1)
+    const bScore = b.applicantTag === applicantTag ? 2 : (b.applicantTag === '*' ? 0 : 1)
+    return bScore - aScore
+  })
+  
+  return matchedRules[0] || null
+}
+
 const normalizeRecord = (item) => ({
   ...item,
   salaryMonth: formatMonthForView(item.salaryMonth)
@@ -115,12 +157,14 @@ const calculateSalary = () => {
 const loadPageData = async () => {
   loading.value = true
   try {
-    const [salaryPage, employeePage] = await Promise.all([
+    const [salaryPage, employeePage, rulePage] = await Promise.all([
       listSalaryRecordsApi({ page: 1, size: 200 }),
-      listEmployeesApi({ page: 1, size: 200 })
+      listEmployeesApi({ page: 1, size: 200 }),
+      listApprovalRulesApi({ page: 1, size: 200, typeCode: 'salary_record' })
     ])
     salaryRecords.value = (salaryPage.items || []).map(normalizeRecord)
     employees.value = employeePage.items || []
+    approvalRules.value = rulePage.items || []
   } catch (error) {
     ElMessage.error(error.message || '薪资数据加载失败')
   } finally {
@@ -262,9 +306,34 @@ const handleSubmitApproval = async () => {
     ElMessage.warning('请选择待提交的薪资记录')
     return
   }
+  
   try {
     const submitDate = new Date().toISOString().slice(0, 10)
-    await Promise.all(rows.map(row => updateSalaryStatus(row, { status: '待审批', submitDate })))
+    
+    // 为每条记录匹配审批规则
+    await Promise.all(rows.map(row => {
+      const rule = matchApprovalRule(row.empId)
+      
+      if (!rule) {
+        // 没有匹配的规则，使用默认流程
+        return updateSalaryStatus(row, { 
+          status: '待审批', 
+          submitDate,
+          pendingApproverRole: 'FINANCE_MANAGER',
+          nextApproverRole: ''
+        })
+      }
+      
+      // 使用规则中的审批人
+      return updateSalaryStatus(row, { 
+        status: '待审批', 
+        submitDate,
+        pendingApproverRole: rule.firstApproverTag,
+        nextApproverRole: rule.secondApproverTag || '',
+        nextApproverScope: rule.secondApproverTag ? (rule.secondApproverScope || 'company') : ''
+      })
+    }))
+    
     await loadPageData()
     ElMessage.success('已批量提交审批')
   } catch (error) {
@@ -274,12 +343,29 @@ const handleSubmitApproval = async () => {
 
 const handleApprove = async (row) => {
   try {
-    await updateSalaryStatus(row, {
-      status: '待发放',
-      approveDate: new Date().toISOString().slice(0, 10)
-    })
+    const approveDate = new Date().toISOString().slice(0, 10)
+    
+    // 检查是否有下一级审批人
+    if (row.nextApproverRole && row.nextApproverRole.trim()) {
+      // 需要二级审批，更新为待二级审批状态
+      await updateSalaryStatus(row, {
+        status: '待审批',
+        approveDate,
+        pendingApproverRole: row.nextApproverRole,
+        nextApproverRole: '',
+        nextApproverScope: ''
+      })
+      ElMessage.success('一级审批通过，等待二级审批')
+    } else {
+      // 不需要二级审批，直接进入待发放
+      await updateSalaryStatus(row, {
+        status: '待发放',
+        approveDate
+      })
+      ElMessage.success('审批通过，待发放')
+    }
+    
     await loadPageData()
-    ElMessage.success('审批通过，待发放')
   } catch (error) {
     ElMessage.error(error.message || '审批失败')
   }
