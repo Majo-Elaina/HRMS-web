@@ -30,6 +30,7 @@ const suggestionList = [
   '帮我总结一下我当前的岗位、部门和身份标签。',
   '最近请假审批规则是什么？',
   '考勤和请假数据主要能查到哪些内容？',
+  '今天绵阳的天气怎么样？',
   '今天工作有点累，陪我聊聊天吧。'
 ]
 
@@ -372,6 +373,26 @@ function handleKeydown(event) {
 </template>
 
 <style scoped>
+/* 允许整个聊天面板进行文本选择 */
+.chat-shell,
+.chat-shell * {
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+}
+
+/* 按钮和交互元素保持不可选择 */
+button,
+.el-button,
+.suggestion-chip,
+.composer-buttons button {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
 .chat-shell {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
