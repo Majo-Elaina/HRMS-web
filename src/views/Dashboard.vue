@@ -789,6 +789,7 @@ onMounted(loadPageData)
 @media (max-width: 900px) {
   .hero-panel {
     flex-direction: column;
+    padding: 24px;
   }
 
   .hero-panel h1 {
@@ -801,12 +802,68 @@ onMounted(loadPageData)
 }
 
 @media (max-width: 640px) {
+  .hero-panel {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .hero-panel h1 {
+    font-size: 28px;
+  }
+
+  .hero-desc {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .hero-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hero-meta span,
+  .pill {
+    width: 100%;
+    text-align: center;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-btn {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
   .metrics-grid {
     grid-template-columns: 1fr;
   }
 
   .actions {
     flex-direction: column;
+  }
+
+  .actions .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .leave-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart {
+    height: 260px;
+  }
+
+  .tile {
+    padding: 14px;
+  }
+
+  :deep(.el-card__body) {
+    padding: 14px;
   }
 }
 </style>

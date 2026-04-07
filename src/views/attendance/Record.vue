@@ -206,7 +206,7 @@ onMounted(loadPageData)
           <el-button v-if="canAddAttendance" type="primary" @click="handleAdd">新增记录</el-button>
         </div>
       </template>
-      <el-table :data="filteredAttendances" stripe border>
+      <el-table :data="filteredAttendances" stripe border class="desktop-table">
         <el-table-column prop="attendanceId" label="ID" width="70" align="center" />
         <el-table-column label="员工姓名" width="110">
           <template #default="{ row }">{{ employeeNameMap[row.empId] || '-' }}</template>
@@ -230,6 +230,37 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in filteredAttendances" :key="row.attendanceId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ employeeNameMap[row.empId] || '-' }}</div>
+              <div class="mobile-card-subtitle">{{ row.attendanceDate }}</div>
+            </div>
+            <el-tag :type="getStatusType(row.status)" round>{{ row.status }}</el-tag>
+          </div>
+
+          <div class="mobile-card-grid">
+            <div class="mobile-item">
+              <span>上班打卡</span>
+              <strong>{{ row.clockIn || '-' }}</strong>
+            </div>
+            <div class="mobile-item">
+              <span>下班打卡</span>
+              <strong>{{ row.clockOut || '-' }}</strong>
+            </div>
+            <div class="mobile-item mobile-item-wide">
+              <span>备注</span>
+              <strong>{{ row.remark || '-' }}</strong>
+            </div>
+          </div>
+
+          <div v-if="canEditAttendance" class="mobile-card-actions">
+            <el-button type="primary" plain @click="handleEdit(row)">编辑</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="form.attendanceId ? '编辑考勤' : '新增考勤'" width="520px" destroy-on-close>
@@ -278,5 +309,91 @@ onMounted(loadPageData)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.mobile-item-wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-card-actions {
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

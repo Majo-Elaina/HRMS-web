@@ -756,8 +756,9 @@ button,
 @media (max-width: 900px) {
   .chat-shell {
     grid-template-columns: 1fr;
-    height: 100vh;
-    padding: 12px;
+    height: 100%;
+    min-height: 0;
+    padding: 10px;
   }
   
   .profile-card {
@@ -766,13 +767,85 @@ button,
   
   .chat-card {
     height: 100%;
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .chat-header {
+    margin-bottom: 12px;
+  }
+
+  .chat-title {
+    font-size: 22px;
+  }
+
+  .chat-header p {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .suggestion-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    max-height: 156px;
+    overflow-y: auto;
+    margin-bottom: 12px;
+    padding-right: 4px;
+  }
+
+  .suggestion-chip {
+    width: 100%;
+    text-align: left;
+    white-space: normal;
+    line-height: 1.45;
+  }
+
+  .chat-viewport {
+    min-height: 140px;
+  }
+
+  .composer {
+    padding-top: 12px;
+  }
+
+  .composer-hint {
+    font-size: 11px;
   }
 }
 
 @media (max-width: 600px) {
+  .chat-card {
+    padding: 14px 12px;
+    border-radius: 18px;
+  }
+
   .chat-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+  }
+
+  .chat-title {
+    font-size: 18px;
+  }
+
+  .header-badges {
+    gap: 6px;
+  }
+
+  .status-banner {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+  }
+
+  .suggestion-list {
+    max-height: 128px;
+    margin-bottom: 10px;
+  }
+
+  .chat-viewport {
+    min-height: 120px;
   }
   
   .composer-actions {
@@ -782,11 +855,43 @@ button,
   
   .composer-buttons {
     width: 100%;
-    justify-content: flex-end;
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .composer-buttons .el-button {
+    width: 100%;
+    margin-left: 0 !important;
   }
   
   .bubble {
     max-width: 100%;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .bubble-avatar {
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .chat-shell {
+    padding: 8px;
+  }
+
+  .chat-card {
+    padding: 12px 10px;
+  }
+
+  .suggestion-list {
+    max-height: 112px;
+  }
+
+  .composer {
+    padding-top: 10px;
   }
 }
 

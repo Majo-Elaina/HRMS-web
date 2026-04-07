@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -9,6 +9,15 @@ const route = useRoute()
 const userStore = useUserStore()
 
 const isCollapse = ref(false)
+const isMobile = ref(false)
+const mobileMenuVisible = ref(false)
+
+const checkViewport = () => {
+  isMobile.value = window.innerWidth <= 768
+  if (!isMobile.value) {
+    mobileMenuVisible.value = false
+  }
+}
 
 const menuList = computed(() => {
   const allMenus = [
@@ -82,17 +91,40 @@ const handleLogout = () => {
     ElMessage.success('已退出登录')
   }).catch(() => {})
 }
+
+const toggleMenu = () => {
+  if (isMobile.value) {
+    mobileMenuVisible.value = !mobileMenuVisible.value
+    return
+  }
+  isCollapse.value = !isCollapse.value
+}
+
+watch(() => route.path, () => {
+  if (isMobile.value) {
+    mobileMenuVisible.value = false
+  }
+})
+
+onMounted(() => {
+  checkViewport()
+  window.addEventListener('resize', checkViewport)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', checkViewport)
+})
 </script>
 
 <template>
   <el-container class="layout-container">
-    <el-aside :width="isCollapse ? '72px' : '240px'" class="aside">
+    <el-aside v-if="!isMobile" :width="isCollapse ? '72px' : '240px'" class="aside">
       <div class="logo">
-        <div class="logo-atri-text" v-show="!isCollapse">
+        <div v-show="!isCollapse" class="logo-atri-text">
           <span class="atri-main">ATRI</span>
           <span class="atri-sub">HRMS</span>
         </div>
-        <div class="logo-atri-mini" v-show="isCollapse">
+        <div v-show="isCollapse" class="logo-atri-mini">
           <span class="atri-mini">A</span>
         </div>
       </div>
@@ -127,28 +159,71 @@ const handleLogout = () => {
       </div>
     </el-aside>
 
+    <transition name="mobile-mask">
+      <div v-if="isMobile && mobileMenuVisible" class="mobile-mask" @click="mobileMenuVisible = false"></div>
+    </transition>
+
+    <transition name="mobile-drawer">
+      <aside v-if="isMobile && mobileMenuVisible" class="mobile-aside">
+        <div class="logo">
+          <div class="logo-atri-text">
+            <span class="atri-main">ATRI</span>
+            <span class="atri-sub">HRMS</span>
+          </div>
+        </div>
+
+        <div class="menu-scroll">
+          <el-menu
+            :default-active="route.path"
+            router
+            background-color="transparent"
+            text-color="#c8d2df"
+            active-text-color="#ffffff"
+          >
+            <template v-for="menu in menuList" :key="menu.index">
+              <el-sub-menu v-if="menu.children" :index="menu.index">
+                <template #title>
+                  <el-icon><component :is="menu.icon" /></el-icon>
+                  <span>{{ menu.title }}</span>
+                </template>
+                <el-menu-item v-for="child in menu.children" :key="child.index" :index="child.index">
+                  <el-icon><component :is="child.icon" /></el-icon>
+                  <span>{{ child.title }}</span>
+                </el-menu-item>
+              </el-sub-menu>
+              <el-menu-item v-else :index="menu.index">
+                <el-icon><component :is="menu.icon" /></el-icon>
+                <span>{{ menu.title }}</span>
+              </el-menu-item>
+            </template>
+          </el-menu>
+        </div>
+      </aside>
+    </transition>
+
     <el-container>
       <el-header class="header">
         <div class="header-left">
-          <el-icon class="collapse-btn" @click="isCollapse = !isCollapse">
-            <Fold v-if="!isCollapse" />
-            <Expand v-else />
+          <el-icon class="collapse-btn" @click="toggleMenu">
+            <Expand v-if="isMobile || isCollapse" />
+            <Fold v-else />
           </el-icon>
-          <el-breadcrumb separator="/">
+          <el-breadcrumb v-if="!isMobile" separator="/">
             <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.meta.title">{{ route.meta.title }}</el-breadcrumb-item>
           </el-breadcrumb>
+          <div v-else class="mobile-page-title">{{ route.meta.title || '首页' }}</div>
         </div>
 
         <div class="header-right">
-          <div class="atri-badge">
+          <div v-if="!isMobile" class="atri-badge">
             <span class="atri-badge-text">ATRI</span>
             <span class="powered-text">Powered</span>
           </div>
           <el-dropdown>
             <span class="user-info">
               <el-avatar :size="34" icon="UserFilled" />
-              <span class="username">{{ userStore.user?.empName }}</span>
+              <span v-if="!isMobile" class="username">{{ userStore.user?.empName }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -180,14 +255,35 @@ const handleLogout = () => {
     linear-gradient(180deg, #f5f7fb 0%, #eef2f7 100%);
 }
 
-.aside {
+.aside,
+.mobile-aside {
   display: flex;
   flex-direction: column;
-  background:
-    linear-gradient(180deg, #18283e 0%, #213754 52%, #22395b 100%);
-  transition: width 0.28s ease;
+  background: linear-gradient(180deg, #18283e 0%, #213754 52%, #22395b 100%);
   overflow: hidden;
+}
+
+.aside {
+  transition: width 0.28s ease;
   box-shadow: 8px 0 24px rgba(12, 27, 52, 0.16);
+}
+
+.mobile-aside {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(82vw, 320px);
+  z-index: 1200;
+  box-shadow: 18px 0 40px rgba(12, 27, 52, 0.28);
+}
+
+.mobile-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1190;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(2px);
 }
 
 .logo {
@@ -339,6 +435,7 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .collapse-btn {
@@ -359,6 +456,15 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.mobile-page-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .atri-badge {
@@ -436,5 +542,88 @@ const handleLogout = () => {
 .main-fullscreen {
   padding: 0;
   overflow: hidden;
+}
+
+.mobile-drawer-enter-active,
+.mobile-drawer-leave-active {
+  transition: transform 0.24s ease;
+}
+
+.mobile-drawer-enter-from,
+.mobile-drawer-leave-to {
+  transform: translateX(-100%);
+}
+
+.mobile-mask-enter-active,
+.mobile-mask-leave-active {
+  transition: opacity 0.24s ease;
+}
+
+.mobile-mask-enter-from,
+.mobile-mask-leave-to {
+  opacity: 0;
+}
+
+@media (max-width: 768px) {
+  .layout-container {
+    height: 100dvh;
+  }
+
+  .header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .header-left {
+    gap: 8px;
+    flex: 1;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .user-info {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .mobile-page-title {
+    font-size: 15px;
+  }
+
+  .main {
+    padding: 12px;
+  }
+
+  .menu-scroll {
+    padding: 12px 10px 16px;
+  }
+
+  .mobile-aside {
+    width: min(84vw, 300px);
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 0 10px;
+  }
+
+  .collapse-btn {
+    padding: 6px;
+  }
+
+  .mobile-page-title {
+    font-size: 14px;
+  }
+
+  .main {
+    padding: 10px;
+  }
+
+  .logo {
+    height: 68px;
+  }
 }
 </style>

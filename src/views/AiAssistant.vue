@@ -28,4 +28,16 @@ const atriAvatar = new URL('../../ai-docs/亚托莉.webp', import.meta.url).href
 .atri-page .el-button {
   user-select: none;
 }
+
+@media (max-width: 768px) {
+  .atri-page {
+    height: calc(100dvh - 60px);
+  }
+}
+
+@media (max-width: 480px) {
+  .atri-page {
+    height: calc(100dvh - 56px);
+  }
+}
 </style>

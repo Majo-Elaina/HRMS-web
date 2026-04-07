@@ -295,7 +295,7 @@ loadPageData()
         </div>
       </template>
 
-      <el-table :data="currentRules" stripe border>
+      <el-table :data="currentRules" stripe border class="desktop-table">
         <el-table-column label="申请人标签" width="150">
           <template #default="{ row }">
             {{ row.applicantTag === '*' ? '任意' : getTagLabel(row.applicantTag) }}
@@ -322,6 +322,37 @@ loadPageData()
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in currentRules" :key="row.id" class="mobile-card">
+          <div class="mobile-card-top">
+            <div class="mobile-card-title">
+              {{ row.applicantTag === '*' ? '任意申请人' : getTagLabel(row.applicantTag) }}
+            </div>
+            <el-tag round>{{ getDaysText(row) }}</el-tag>
+          </div>
+
+          <div class="mobile-card-grid">
+            <div class="mobile-item">
+              <span>一级审批人</span>
+              <strong>{{ getRoleLabel(row.firstApproverTag) }}</strong>
+            </div>
+            <div class="mobile-item">
+              <span>二级审批人</span>
+              <strong>{{ row.secondApproverTag ? getRoleLabel(row.secondApproverTag) : '-' }}</strong>
+            </div>
+            <div class="mobile-item mobile-item-wide" v-if="row.secondApproverTag">
+              <span>二级审批范围</span>
+              <strong>{{ scopeOptions.find((item) => item.value === row.secondApproverScope)?.label || '-' }}</strong>
+            </div>
+          </div>
+
+          <div class="mobile-card-actions">
+            <el-button type="primary" plain @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" plain @click="handleDelete(row)">删除</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="520px" destroy-on-close>
@@ -423,5 +454,110 @@ loadPageData()
 .header-actions {
   display: flex;
   gap: 10px;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.mobile-item-wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .title-wrap,
+  .header-actions {
+    width: 100%;
+  }
+
+  .type-select {
+    width: 100%;
+  }
+
+  .header-actions {
+    flex-direction: column;
+  }
+
+  .header-actions .el-button {
+    width: 100%;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

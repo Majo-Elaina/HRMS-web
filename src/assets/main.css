@@ -257,8 +257,266 @@ textarea,
 }
 
 @media (max-width: 768px) {
+  html,
+  body,
+  #app {
+    min-height: 100dvh;
+  }
+
+  body {
+    font-size: 14px;
+  }
+
+  .el-card {
+    border-radius: 18px;
+  }
+
+  .el-card__header,
+  .el-card__body {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+
+  .card-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-header > * {
+    width: 100%;
+  }
+
+  .card-header .el-button {
+    width: 100%;
+  }
+
+  .card-header > span:first-child,
+  .card-header .header-title,
+  .card-header .search-title {
+    font-size: 16px;
+    line-height: 1.4;
+  }
+
+  .search-card .el-card__body {
+    overflow-x: visible;
+  }
+
+  .search-card .el-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .search-card .el-form .el-form-item {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 0;
+    display: block;
+  }
+
+  .search-card .el-form .el-form-item__label,
+  .search-card .el-form .el-form-item__content {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    margin-left: 0 !important;
+  }
+
+  .search-card .el-form .el-form-item__content {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .search-card .el-form .el-form-item__content > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .search-card .el-form-item__label {
+    width: 100% !important;
+    justify-content: flex-start;
+    padding-bottom: 6px;
+  }
+
+  .search-card .el-input,
+  .search-card .el-select,
+  .search-card .el-date-editor,
+  .search-card .el-input-number,
+  .search-card .el-button {
+    width: 100% !important;
+  }
+
+  .search-card .el-date-editor.el-range-editor,
+  .search-card .el-date-editor--daterange,
+  .search-card .el-date-editor--month,
+  .search-card .el-date-editor--date {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .search-card .el-date-editor.el-range-editor {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .search-card .el-date-editor.el-range-editor .el-range-input {
+    min-width: 0;
+    width: 0;
+    font-size: 13px;
+  }
+
+  .search-card .el-date-editor.el-range-editor .el-range-separator {
+    width: auto;
+    min-width: auto;
+    padding: 0 4px;
+    color: #64748b;
+  }
+
+  .search-card .el-date-editor.el-range-editor .el-range__icon,
+  .search-card .el-date-editor.el-range-editor .el-range__close-icon {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .search-card .el-form .el-form-item:last-child .el-form-item__content {
+    gap: 10px;
+  }
+
+  .el-card__body {
+    overflow-x: auto;
+  }
+
+  .el-table {
+    min-width: 720px;
+  }
+
+  .mobile-list {
+    padding-bottom: 2px;
+  }
+
+  .mobile-card,
+  .employee-mobile-card,
+  .salary-mobile-card {
+    border-radius: 16px !important;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06) !important;
+  }
+
+  .mobile-card-title,
+  .emp-name {
+    font-size: 15px !important;
+  }
+
+  .mobile-card-subtitle,
+  .emp-meta {
+    font-size: 12px !important;
+  }
+
+  .mobile-item,
+  .money-item {
+    padding: 10px !important;
+    border-radius: 12px !important;
+  }
+
+  .mobile-card-actions,
+  .action-buttons,
+  .header-actions {
+    gap: 8px !important;
+  }
+
+  .mobile-card-actions .el-button,
+  .header-actions .el-button,
+  .actions .el-button {
+    min-height: 42px;
+  }
+
+  .el-form-item__label {
+    line-height: 1.4;
+    padding-bottom: 6px;
+  }
+
   .el-dialog {
     width: calc(100vw - 24px) !important;
+    max-width: none !important;
     margin: 12px auto;
+  }
+
+  .el-dialog__header,
+  .el-dialog__body,
+  .el-dialog__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .el-dialog .el-form {
+    --el-form-label-width: 100% !important;
+  }
+
+  .el-dialog .el-form-item {
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  .el-dialog .el-form-item__label,
+  .el-dialog .el-form-item__content {
+    display: block;
+    width: 100%;
+    margin-left: 0 !important;
+    justify-content: flex-start;
+  }
+
+  .el-dialog .el-input,
+  .el-dialog .el-select,
+  .el-dialog .el-date-editor,
+  .el-dialog .el-input-number,
+  .el-dialog .el-time-editor,
+  .el-dialog .el-textarea {
+    width: 100% !important;
+  }
+
+  .el-dialog__footer {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .el-dialog__footer .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .el-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .el-dialog {
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .el-card__header,
+  .el-card__body {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .search-card .el-form {
+    gap: 8px;
+  }
+
+  .mobile-card,
+  .employee-mobile-card,
+  .salary-mobile-card {
+    padding: 14px !important;
+  }
+
+  .mobile-card-actions .el-button,
+  .header-actions .el-button {
+    font-size: 13px;
   }
 }

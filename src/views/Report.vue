@@ -291,17 +291,17 @@ onMounted(loadPageData)
     <el-tabs v-model="activeTab" type="border-card">
       <el-tab-pane label="员工统计" name="employee">
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :xs="24" :md="12" :xl="8">
             <el-card shadow="hover">
               <v-chart class="chart" :option="genderChartOption" autoresize />
             </el-card>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :md="12" :xl="8">
             <el-card shadow="hover">
               <v-chart class="chart" :option="statusChartOption" autoresize />
             </el-card>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :md="24" :xl="8">
             <el-card shadow="hover" class="stat-summary">
               <h3>员工概况</h3>
               <div class="stat-item">
@@ -324,7 +324,7 @@ onMounted(loadPageData)
           </el-col>
         </el-row>
         <el-row :gutter="20" style="margin-top: 20px;">
-          <el-col :span="24">
+          <el-col :xs="24" :span="24">
             <el-card shadow="hover">
               <v-chart class="chart-large" :option="deptChartOption" autoresize />
             </el-card>
@@ -334,41 +334,41 @@ onMounted(loadPageData)
 
       <el-tab-pane label="考勤统计" name="attendance">
         <el-row :gutter="20">
-          <el-col :span="16">
+          <el-col :xs="24" :xl="16">
             <el-card shadow="hover">
               <v-chart class="chart" :option="attendanceChartOption" autoresize />
             </el-card>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :xl="8">
             <el-card shadow="hover">
               <v-chart class="chart" :option="attendanceStatusOption" autoresize />
             </el-card>
           </el-col>
         </el-row>
         <el-row :gutter="20" style="margin-top: 20px;">
-          <el-col :span="24">
+          <el-col :xs="24" :span="24">
             <el-card shadow="hover" class="stat-summary">
               <h3>考勤概况</h3>
               <el-row :gutter="40">
-                <el-col :span="6">
+                <el-col :xs="12" :md="6">
                   <div class="stat-box">
                     <div class="stat-num">{{ summary.attendanceRate }}%</div>
                     <div class="stat-label">本月出勤率</div>
                   </div>
                 </el-col>
-                <el-col :span="6">
+                <el-col :xs="12" :md="6">
                   <div class="stat-box">
                     <div class="stat-num success">{{ attendanceStatusPie.find(item => item.name === '正常')?.value || 0 }}</div>
                     <div class="stat-label">正常出勤(人次)</div>
                   </div>
                 </el-col>
-                <el-col :span="6">
+                <el-col :xs="12" :md="6">
                   <div class="stat-box">
                     <div class="stat-num warning">{{ attendanceStatusPie.find(item => item.name === '迟到')?.value || 0 }}</div>
                     <div class="stat-label">迟到(人次)</div>
                   </div>
                 </el-col>
-                <el-col :span="6">
+                <el-col :xs="12" :md="6">
                   <div class="stat-box">
                     <div class="stat-num danger">{{ attendanceStatusPie.find(item => item.name === '缺勤')?.value || 0 }}</div>
                     <div class="stat-label">缺勤(人次)</div>
@@ -382,19 +382,19 @@ onMounted(loadPageData)
 
       <el-tab-pane label="薪酬统计" name="salary">
         <el-row :gutter="20">
-          <el-col :span="24">
+          <el-col :xs="24" :span="24">
             <el-card shadow="hover">
               <v-chart class="chart-large" :option="salaryTrendOption" autoresize />
             </el-card>
           </el-col>
         </el-row>
         <el-row :gutter="20" style="margin-top: 20px;">
-          <el-col :span="16">
+          <el-col :xs="24" :xl="16">
             <el-card shadow="hover">
               <v-chart class="chart" :option="deptSalaryOption" autoresize />
             </el-card>
           </el-col>
-          <el-col :span="8">
+          <el-col :xs="24" :xl="8">
             <el-card shadow="hover" class="stat-summary">
               <h3>薪酬概况</h3>
               <div class="stat-item">
@@ -501,5 +501,36 @@ onMounted(loadPageData)
 .stat-box .stat-label {
   margin-top: 10px;
   color: #909399;
+}
+
+@media (max-width: 768px) {
+  .report-page :deep(.el-tabs__header) {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .report-page :deep(.el-tabs__nav) {
+    flex-wrap: nowrap;
+  }
+
+  .chart {
+    height: 260px;
+  }
+
+  .chart-large {
+    height: 300px;
+  }
+
+  .stat-box {
+    padding: 14px 8px;
+  }
+
+  .stat-box .stat-num {
+    font-size: 28px;
+  }
+
+  .stat-item .value {
+    font-size: 16px;
+  }
 }
 </style>

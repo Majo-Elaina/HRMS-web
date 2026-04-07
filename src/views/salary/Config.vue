@@ -217,7 +217,7 @@ onMounted(loadConfigs)
           </div>
         </div>
       </template>
-      <el-table :data="filteredConfigs" stripe border @selection-change="handleSelectionChange">
+      <el-table :data="filteredConfigs" stripe border class="desktop-table" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="configId" label="ID" width="70" align="center" />
         <el-table-column prop="configName" label="配置名称" width="150" />
@@ -237,6 +237,38 @@ onMounted(loadConfigs)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in filteredConfigs" :key="row.configId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ row.configName }}</div>
+              <div class="mobile-card-subtitle">{{ row.configKey }}</div>
+            </div>
+            <el-tag :type="getStatusType(row.status)" round>{{ row.status }}</el-tag>
+          </div>
+
+          <div class="mobile-card-grid">
+            <div class="mobile-item">
+              <span>配置值</span>
+              <strong>{{ row.configValue }}</strong>
+            </div>
+            <div class="mobile-item">
+              <span>生效日期</span>
+              <strong>{{ row.effectiveDate }}</strong>
+            </div>
+            <div class="mobile-item mobile-item-wide">
+              <span>配置说明</span>
+              <strong>{{ row.configDesc || '-' }}</strong>
+            </div>
+          </div>
+
+          <div class="mobile-card-actions">
+            <el-button v-if="canEditConfig" type="primary" plain @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status === '寰呭鎵?' && canApproveConfig" type="success" plain @click="handleApproveConfig(row)">审批通过</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="form.configId ? '编辑配置' : '新增配置'" width="500px" destroy-on-close>
@@ -281,5 +313,107 @@ onMounted(loadConfigs)
 }
 .search-card :deep(.el-card__body) {
   padding-bottom: 0;
+}
+
+.desktop-table {
+  display: table;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.mobile-item-wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .header-actions .el-button {
+    width: 100%;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

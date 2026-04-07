@@ -490,7 +490,7 @@ onMounted(loadPageData)
         </div>
       </template>
 
-      <el-table :data="filteredLeaves" stripe border>
+      <el-table :data="filteredLeaves" stripe border class="desktop-table">
         <el-table-column prop="leaveId" label="ID" width="70" align="center" />
         <el-table-column label="申请人" width="100">
           <template #default="{ row }">{{ employeeMap[row.empId]?.empName || '-' }}</template>
@@ -513,6 +513,42 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in filteredLeaves" :key="row.leaveId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ employeeMap[row.empId]?.empName || '-' }}</div>
+              <div class="mobile-card-subtitle">{{ row.leaveType }} · {{ row.days }} 天</div>
+            </div>
+            <el-tag :type="getStatusType(row.status)" round>{{ getStatusLabel(row) }}</el-tag>
+          </div>
+
+          <div class="mobile-card-grid">
+            <div class="mobile-item">
+              <span>开始日期</span>
+              <strong>{{ row.startDate }}</strong>
+            </div>
+            <div class="mobile-item">
+              <span>结束日期</span>
+              <strong>{{ row.endDate }}</strong>
+            </div>
+            <div class="mobile-item">
+              <span>申请时间</span>
+              <strong>{{ row.applyTime || '-' }}</strong>
+            </div>
+            <div class="mobile-item mobile-item-wide">
+              <span>请假原因</span>
+              <strong>{{ row.reason || '-' }}</strong>
+            </div>
+          </div>
+
+          <div class="mobile-card-actions">
+            <el-button v-if="canApprove(row)" type="primary" plain @click="handleApprove(row)">审批</el-button>
+            <el-button v-if="canCancel(row)" type="danger" plain @click="handleCancel(row)">取消</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" title="新增请假申请" width="520px" destroy-on-close>
@@ -579,5 +615,93 @@ onMounted(loadPageData)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.mobile-item-wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -644,17 +644,98 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .login-container {
-    padding: 20px;
+    min-height: 100dvh;
+    align-items: stretch;
+    padding: 16px;
   }
   
   .login-box {
     width: 100%;
     max-width: 400px;
-    padding: 30px 25px;
+    margin: auto 0;
+    padding: 24px 18px;
+    border-radius: 18px;
   }
   
   .account-grid {
     grid-template-columns: 1fr;
+  }
+
+  .login-header {
+    margin-bottom: 24px;
+  }
+
+  .header-atri-text {
+    font-size: 38px;
+  }
+
+  .login-header h2 {
+    font-size: 20px;
+    line-height: 1.4;
+  }
+
+  .welcome-text {
+    font-size: 13px;
+  }
+
+  .login-tips {
+    padding: 14px;
+    max-height: 34dvh;
+    overflow: auto;
+  }
+
+  .account-item {
+    padding: 9px 10px;
+  }
+
+  .account-item span {
+    word-break: break-all;
+    line-height: 1.55;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 12px;
+  }
+
+  .login-box {
+    padding: 20px 14px;
+    border-radius: 16px;
+  }
+
+  .header-atri-text {
+    font-size: 32px;
+    letter-spacing: 2px;
+  }
+
+  .header-atri-subtitle {
+    font-size: 12px;
+  }
+
+  .login-header h2 {
+    font-size: 18px;
+  }
+
+  .login-btn {
+    height: 46px;
+    font-size: 15px;
+  }
+
+  .tips-header {
+    margin-bottom: 12px;
+  }
+
+  .login-tips {
+    max-height: 38dvh;
+  }
+
+  .account-item strong {
+    font-size: 13px;
+  }
+
+  .account-item span {
+    font-size: 12px;
   }
 }
 

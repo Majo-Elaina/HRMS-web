@@ -94,7 +94,7 @@ onMounted(loadPageData)
           <span class="tips">按身份标签配置不同模块的数据可见范围</span>
         </div>
       </template>
-      <el-table :data="rows" stripe border>
+      <el-table :data="rows" stripe border class="desktop-table">
         <el-table-column prop="moduleName" label="模块" width="180" />
         <el-table-column label="范围规则" min-width="320">
           <template #default="{ row }">
@@ -116,6 +116,27 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in rows" :key="row.moduleCode" class="mobile-card">
+          <div class="mobile-card-top">
+            <div class="mobile-card-title">{{ row.moduleName }}</div>
+          </div>
+          <div class="tag-row">
+            <el-tag
+              v-for="item in getTagScopeSummary(row)"
+              :key="`${row.moduleCode}-${item.tag}`"
+              size="small"
+              class="rule-tag"
+            >
+              {{ item.tag }}：{{ item.scope }}
+            </el-tag>
+          </div>
+          <div class="mobile-card-actions">
+            <el-button type="primary" plain @click="handleEdit(row)">编辑</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" title="编辑模块范围" width="600px" destroy-on-close>
@@ -167,5 +188,57 @@ onMounted(loadPageData)
 
 .rule-tag {
   margin: 2px 0;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-actions {
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tips {
+    line-height: 1.5;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
 }
 </style>

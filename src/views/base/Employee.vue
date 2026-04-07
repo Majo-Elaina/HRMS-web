@@ -318,7 +318,7 @@ onMounted(loadPageData)
           </div>
         </template>
 
-        <el-table :data="filteredEmployees" class="employee-table" size="large">
+        <el-table :data="filteredEmployees" class="employee-table desktop-table" size="large">
           <el-table-column prop="empId" label="ID" width="80" align="center">
             <template #default="{ row }">
               <div class="emp-id">#{{ row.empId }}</div>
@@ -390,6 +390,52 @@ onMounted(loadPageData)
             </template>
           </el-table-column>
         </el-table>
+
+        <div class="employee-mobile-list">
+          <div v-for="row in filteredEmployees" :key="row.empId" class="employee-mobile-card">
+            <div class="mobile-card-top">
+              <div class="employee-info">
+                <div class="emp-avatar">
+                  <el-avatar :size="42" icon="UserFilled" />
+                </div>
+                <div class="emp-details">
+                  <div class="emp-name">{{ row.empName }}</div>
+                  <div class="emp-meta">#{{ row.empId }} · {{ row.gender }} · {{ row.phone }}</div>
+                </div>
+              </div>
+              <el-tag
+                :type="row.status === '鍦ㄨ亴' ? 'success' : row.status === '璇曠敤' ? 'warning' : 'info'"
+                round
+              >
+                {{ row.status }}
+              </el-tag>
+            </div>
+
+            <div class="mobile-card-grid">
+              <div class="mobile-item">
+                <span>部门</span>
+                <strong>{{ getDeptName(row.deptId) }}</strong>
+              </div>
+              <div class="mobile-item">
+                <span>职位</span>
+                <strong>{{ getPositionName(row.positionId) }}</strong>
+              </div>
+              <div class="mobile-item mobile-item-wide">
+                <span>邮箱</span>
+                <strong>{{ row.email || '-' }}</strong>
+              </div>
+              <div class="mobile-item">
+                <span>入职日期</span>
+                <strong>{{ row.hireDate }}</strong>
+              </div>
+            </div>
+
+            <div class="mobile-card-actions">
+              <el-button v-if="canEditEmployee" type="primary" plain @click="handleEdit(row)">编辑</el-button>
+              <el-button v-if="canDeleteEmployee" type="danger" plain @click="handleDelete(row)">删除</el-button>
+            </div>
+          </div>
+        </div>
       </el-card>
     </div>
 
@@ -677,6 +723,67 @@ onMounted(loadPageData)
   overflow: hidden;
 }
 
+.employee-mobile-list {
+  display: none;
+}
+
+.employee-mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.mobile-item-wide {
+  grid-column: 1 / -1;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1;
+}
+
 .employee-table :deep(.el-table__header) {
   background: #f8fafc;
 }
@@ -840,6 +947,62 @@ onMounted(loadPageData)
   }
   
   .search-form :deep(.el-form-item) {
+    width: 100%;
+  }
+
+  .header-actions,
+  .table-header,
+  .header-left,
+  .header-right {
+    width: 100%;
+  }
+
+  .header-actions .el-button,
+  .header-right .el-tag {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .page-description {
+    font-size: 14px;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .employee-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .employee-form {
+    padding: 0;
+  }
+
+  .employee-dialog :deep(.el-row) {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .employee-dialog :deep(.el-col) {
+    max-width: 100%;
+    flex: 0 0 100%;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .dialog-footer {
+    padding: 0;
+    flex-direction: column-reverse;
+  }
+
+  .dialog-footer .el-button {
     width: 100%;
   }
 }

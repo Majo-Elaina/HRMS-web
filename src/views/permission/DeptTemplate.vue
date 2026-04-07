@@ -134,7 +134,7 @@ onMounted(loadPageData)
         </div>
       </template>
 
-      <el-table :data="tableRows" stripe border>
+      <el-table :data="tableRows" stripe border class="desktop-table">
         <el-table-column prop="deptName" label="部门名称" width="220" />
         <el-table-column label="可见模块" min-width="420">
           <template #default="{ row }">
@@ -155,6 +155,26 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in tableRows" :key="row.deptId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div class="mobile-card-title">{{ row.deptName }}</div>
+          </div>
+          <div v-if="!row.modules.length" class="empty-modules">
+            <span class="empty-modules__badge">未配置</span>
+            <span class="empty-modules__text">当前部门还没有设置可见模块</span>
+          </div>
+          <div v-else class="module-tag-list">
+            <el-tag v-for="moduleCode in row.modules" :key="moduleCode" class="module-tag">
+              {{ moduleLabelMap[moduleCode] || moduleCode }}
+            </el-tag>
+          </div>
+          <div class="mobile-card-actions">
+            <el-button type="primary" plain @click="handleEdit(row)">编辑</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" title="编辑部门权限模板" width="520px" destroy-on-close>
@@ -207,6 +227,36 @@ onMounted(loadPageData)
   margin: 0;
 }
 
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-actions {
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  width: 100%;
+}
+
 .empty-modules {
   display: inline-flex;
   align-items: center;
@@ -241,5 +291,30 @@ onMounted(loadPageData)
 :deep(.el-table .cell) {
   padding-top: 10px;
   padding-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .el-button {
+    width: 100%;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .empty-modules {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

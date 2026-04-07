@@ -232,7 +232,7 @@ onMounted(loadPageData)
         </div>
       </template>
 
-      <el-table :data="visibleRoles" stripe border>
+      <el-table :data="visibleRoles" stripe border class="desktop-table">
         <el-table-column prop="roleId" label="角色ID" width="100" align="center" />
         <el-table-column prop="roleName" label="角色名称" width="180" />
         <el-table-column prop="roleCode" label="角色编码" width="180" />
@@ -253,6 +253,27 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in visibleRoles" :key="row.roleId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ row.roleName }}</div>
+              <div class="mobile-card-subtitle">{{ row.roleCode }}</div>
+            </div>
+            <el-tag round>{{ row.roleId }}</el-tag>
+          </div>
+          <div class="mobile-item">
+            <span>角色描述</span>
+            <strong>{{ row.roleDesc || '-' }}</strong>
+          </div>
+          <div class="mobile-card-actions">
+            <el-button v-if="canEditRole" type="primary" plain @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="canConfigRole" type="warning" plain @click="handlePermission(row)">权限配置</el-button>
+            <el-button v-if="canDeleteRole" type="danger" plain :disabled="row.roleCode === 'ADMIN'" @click="handleDelete(row)">删除</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" destroy-on-close>
@@ -320,6 +341,94 @@ onMounted(loadPageData)
   display: flex;
   gap: 8px;
 }
-</style>
 
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1 1 100%;
+}
+
+@media (max-width: 768px) {
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .perm-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .perm-actions {
+    flex-direction: column;
+  }
+
+  .perm-actions .el-button {
+    width: 100%;
+  }
+}
+</style>
 

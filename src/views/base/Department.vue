@@ -145,7 +145,7 @@ onMounted(loadDepartments)
         </div>
       </template>
 
-      <el-table :data="visibleDepartments" stripe border>
+      <el-table :data="visibleDepartments" stripe border class="desktop-table">
         <el-table-column prop="deptId" label="部门ID" width="100" align="center" />
         <el-table-column prop="deptName" label="部门名称" width="160" />
         <el-table-column label="上级部门" width="160">
@@ -159,6 +159,31 @@ onMounted(loadDepartments)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in visibleDepartments" :key="row.deptId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ row.deptName }}</div>
+              <div class="mobile-card-subtitle">部门 ID：{{ row.deptId }}</div>
+            </div>
+          </div>
+          <div class="mobile-card-grid">
+            <div class="mobile-item">
+              <span>上级部门</span>
+              <strong>{{ getParentName(row.parentId) }}</strong>
+            </div>
+            <div class="mobile-item mobile-item-wide">
+              <span>部门描述</span>
+              <strong>{{ row.deptDesc || '-' }}</strong>
+            </div>
+          </div>
+          <div class="mobile-card-actions">
+            <el-button v-if="canEditDepartment" type="primary" plain @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="canDeleteDepartment" type="danger" plain @click="handleDelete(row)">删除</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" destroy-on-close>
@@ -193,5 +218,81 @@ onMounted(loadDepartments)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.mobile-card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
 }
 </style>

@@ -247,7 +247,7 @@ onMounted(loadPageData)
         </div>
       </template>
 
-      <el-table :data="filteredUsers" stripe border>
+      <el-table :data="filteredUsers" stripe border class="desktop-table">
         <el-table-column prop="userId" label="用户ID" width="90" align="center" />
         <el-table-column prop="username" label="用户名" width="140" />
         <el-table-column label="关联员工" width="120">
@@ -277,6 +277,43 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="mobile-list">
+        <div v-for="row in filteredUsers" :key="row.userId" class="mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ row.username }}</div>
+              <div class="mobile-card-subtitle">用户 ID：{{ row.userId }}</div>
+            </div>
+            <el-tag :type="row.status === '鍚敤' ? 'success' : 'danger'" round>{{ row.status }}</el-tag>
+          </div>
+
+          <div class="mobile-card-grid">
+            <div class="mobile-item">
+              <span>关联员工</span>
+              <strong>{{ getEmpName(row.empId) }}</strong>
+            </div>
+            <div class="mobile-item">
+              <span>角色</span>
+              <strong>{{ getRoleName(row.roleId) }}</strong>
+            </div>
+          </div>
+
+          <div class="mobile-card-actions">
+            <el-button v-if="canEditUser" type="primary" plain @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="canEditUser" type="warning" plain @click="handleResetPassword(row)">重置密码</el-button>
+            <el-button
+              v-if="canEditUser"
+              :type="row.status === '鍚敤' ? 'danger' : 'success'"
+              plain
+              @click="handleToggleStatus(row)"
+            >
+              {{ row.status === '鍚敤' ? '禁用' : '启用' }}
+            </el-button>
+            <el-button v-if="canDeleteUser" type="danger" plain @click="handleDelete(row)">删除</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" destroy-on-close>
@@ -328,5 +365,89 @@ onMounted(loadPageData)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.mobile-list {
+  display: none;
+}
+
+.mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mobile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.mobile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mobile-item strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1 1 100%;
+}
+
+@media (max-width: 768px) {
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

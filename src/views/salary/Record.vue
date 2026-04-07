@@ -425,7 +425,7 @@ onMounted(loadPageData)
           </div>
         </div>
       </template>
-      <el-table :data="filteredSalaries" stripe border @selection-change="handleSelectionChange">
+      <el-table :data="filteredSalaries" stripe border class="desktop-table" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="50" />
         <el-table-column prop="salaryId" label="ID" width="70" align="center" />
         <el-table-column label="员工姓名" width="110">
@@ -462,6 +462,44 @@ onMounted(loadPageData)
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="salary-mobile-list">
+        <div v-for="row in filteredSalaries" :key="row.salaryId" class="salary-mobile-card">
+          <div class="mobile-card-top">
+            <div>
+              <div class="mobile-card-title">{{ employeeNameMap[row.empId] || '-' }}</div>
+              <div class="mobile-card-subtitle">薪资月份：{{ row.salaryMonth }}</div>
+            </div>
+            <el-tag :type="getStatusType(row.status)" round>{{ row.status }}</el-tag>
+          </div>
+
+          <div class="mobile-money-grid">
+            <div class="money-item">
+              <span>应发工资</span>
+              <strong>{{ formatMoney(row.grossSalary) }}</strong>
+            </div>
+            <div class="money-item money-item-emphasis">
+              <span>实发工资</span>
+              <strong>{{ formatMoney(row.netSalary) }}</strong>
+            </div>
+            <div class="money-item">
+              <span>审批日期</span>
+              <strong>{{ row.approveDate || '-' }}</strong>
+            </div>
+            <div class="money-item">
+              <span>发放日期</span>
+              <strong>{{ row.payDate || '-' }}</strong>
+            </div>
+          </div>
+
+          <div class="mobile-card-actions">
+            <el-button type="primary" plain @click="handleDetail(row)">详情</el-button>
+            <el-button v-if="canEditSalary" type="primary" plain @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.status === '寰呭彂鏀?' && canDirectPay" type="success" plain @click="handlePay(row)">直接发放</el-button>
+            <el-button v-if="row.status === '寰呭鎵?' && canApproveSalary" type="warning" plain @click="handleApprove(row)">审批通过</el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="form.salaryId ? '编辑薪资' : '新增薪资'" width="600px" destroy-on-close>
@@ -593,5 +631,116 @@ onMounted(loadPageData)
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+}
+
+.salary-mobile-list {
+  display: none;
+}
+
+.salary-mobile-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.mobile-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mobile-card-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.mobile-money-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.money-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.money-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.money-item strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.money-item-emphasis strong {
+  color: #16a34a;
+}
+
+.mobile-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mobile-card-actions .el-button {
+  flex: 1 1 calc(50% - 5px);
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .header-actions .el-button {
+    width: 100%;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .salary-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .mobile-money-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-buttons {
+    white-space: normal;
+  }
+
+  :deep(.el-descriptions) {
+    --el-descriptions-item-bordered-label-background: #f8fafc;
+  }
+
+  :deep(.el-descriptions__table) {
+    display: block;
+    overflow-x: auto;
+  }
 }
 </style>
