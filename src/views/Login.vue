@@ -20,10 +20,10 @@ const isTransitioning = ref(false)
 
 // 背景图片列表（排除竖屏的01）
 const backgroundImages = [
-  '/src/assets/images/亚托莉00.jpg',
-  '/src/assets/images/亚托莉02.jpg',
-  '/src/assets/images/亚托莉03.jpg',
-  '/src/assets/images/亚托莉04.jpg'
+  new URL('../assets/images/亚托莉00.jpg', import.meta.url).href,
+  new URL('../assets/images/亚托莉02.jpg', import.meta.url).href,
+  new URL('../assets/images/亚托莉03.jpg', import.meta.url).href,
+  new URL('../assets/images/亚托莉04.jpg', import.meta.url).href
 ]
 
 const rules = {
