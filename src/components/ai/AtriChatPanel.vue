@@ -21,6 +21,7 @@ const providerLabel = ref('加载中...')
 const providerAvailable = ref(true)
 const providerNotice = ref('')
 const sourceHints = ref([])
+const isSuggestionsExpanded = ref(true)
 
 const suggestionList = [
   '本公司员工总数是多少？',
@@ -109,6 +110,10 @@ async function loadHistory() {
 
 function useSuggestion(text) {
   input.value = text
+}
+
+function toggleSuggestions() {
+  isSuggestionsExpanded.value = !isSuggestionsExpanded.value
 }
 
 function pushMessage(message) {
@@ -308,16 +313,27 @@ function handleKeydown(event) {
         </div>
       </div>
 
-      <div class="suggestion-list">
+      <div class="suggestion-section">
         <button
-          v-for="item in suggestionList"
-          :key="item"
           type="button"
-          class="suggestion-chip"
-          @click="useSuggestion(item)"
+          class="suggestion-toggle"
+          @click="toggleSuggestions"
         >
-          {{ item }}
+          <span class="suggestion-toggle-text">快捷提示</span>
+          <span class="suggestion-toggle-icon">{{ isSuggestionsExpanded ? '▴' : '▾' }}</span>
         </button>
+
+        <div v-show="isSuggestionsExpanded" class="suggestion-list">
+          <button
+            v-for="item in suggestionList"
+            :key="item"
+            type="button"
+            class="suggestion-chip"
+            @click="useSuggestion(item)"
+          >
+            {{ item }}
+          </button>
+        </div>
       </div>
 
       <div ref="chatViewportRef" class="chat-viewport">
@@ -597,6 +613,45 @@ button,
   flex-shrink: 0;
 }
 
+.suggestion-section {
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.suggestion-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(50, 109, 233, 0.08);
+  color: #1f3f8f;
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.18s ease;
+}
+
+.suggestion-toggle:hover {
+  background: rgba(50, 109, 233, 0.14);
+}
+
+.suggestion-toggle-text {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.suggestion-toggle-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.suggestion-section .suggestion-list {
+  margin-bottom: 0;
+}
+
 .suggestion-chip {
   padding: 8px 12px;
   border: 0;
@@ -794,6 +849,15 @@ button,
     padding-right: 4px;
   }
 
+  .suggestion-section {
+    margin-bottom: 12px;
+  }
+
+  .suggestion-toggle {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+
   .suggestion-chip {
     width: 100%;
     text-align: left;
@@ -844,6 +908,14 @@ button,
     margin-bottom: 10px;
   }
 
+  .suggestion-section {
+    margin-bottom: 10px;
+  }
+
+  .suggestion-toggle-text {
+    font-size: 12px;
+  }
+
   .chat-viewport {
     min-height: 120px;
   }
@@ -888,6 +960,10 @@ button,
 
   .suggestion-list {
     max-height: 112px;
+  }
+
+  .suggestion-toggle {
+    border-radius: 14px;
   }
 
   .composer {
