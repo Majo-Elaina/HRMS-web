@@ -1,12 +1,6 @@
-export const LEAVE_TYPES = ['年假', '病假', '事假', '婚假', '产假', '陪产假', '丧假']
+import { LEAVE_STATUS, LEAVE_TYPES } from './approvalModel'
 
-export const LEAVE_STATUS = {
-  pending1: '待一级审批',
-  pending2: '待二级审批',
-  approved: '已通过',
-  rejected: '已拒绝',
-  canceled: '已取消'
-}
+export { LEAVE_STATUS, LEAVE_TYPES }
 
 export const AGENT_EXAMPLE_COMMANDS = [
   '帮我提交 2026-03-20 到 2026-03-21 的病假，原因发烧需要休息',

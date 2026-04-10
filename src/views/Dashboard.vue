@@ -8,16 +8,13 @@ import { CanvasRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { listApprovalRulesApi } from '@/api/approvalRule'
 import { listAttendanceApi, createAttendanceApi, updateAttendanceApi } from '@/api/attendance'
-import { listDepartmentsApi } from '@/api/department'
 import { listEmployeesApi } from '@/api/employee'
-import { createLeaveRequestApi, listLeaveRequestsApi, updateLeaveRequestApi } from '@/api/leave'
-import { listPositionsApi } from '@/api/position'
+import { createLeaveRequestApi, listLeaveRequestsApi } from '@/api/leave'
 import { getReportSummaryApi } from '@/api/report'
-import { listSalaryRecordsApi } from '@/api/salaryRecord'
 import { ATTENDANCE_STATUS, getAttendanceStatusType, resolveAttendanceStatus } from '@/utils/smartRemark'
 import { calculateLeaveDays, LEAVE_STATUS, LEAVE_TYPES } from '@/utils/agentAssistant'
+import { getTagLabel } from '@/utils/approvalModel'
 
 use([CanvasRenderer, PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent])
 
@@ -38,12 +35,8 @@ const summary = ref({
   departmentStats: []
 })
 const employees = ref([])
-const departments = ref([])
-const positions = ref([])
 const leaveRequests = ref([])
 const attendanceRecords = ref([])
-const salaryRecords = ref([])
-const approvalRules = ref([])
 
 const leaveForm = reactive({
   leaveType: LEAVE_TYPES[0],
@@ -61,17 +54,6 @@ const leaveRules = {
 
 const today = computed(() => new Date().toISOString().slice(0, 10))
 const leaveScope = computed(() => userStore.getModuleScope('attendance:leave'))
-
-const roleLabelMap = {
-  'ADMIN': '系统管理员',
-  'HR': 'HR专员',
-  'MANAGER': '部门经理',
-  'EMPLOYEE': '普通员工',
-  'FINANCE_MANAGER': '财务经理',
-  'FINANCE': '财务专员',
-  'HR_MANAGER': 'HR经理',
-  'GENERAL_MANAGER': '总经理'
-}
 
 const currentEmployee = computed(() => employees.value.find(item => item.empId === userStore.empId) || null)
 
@@ -144,120 +126,6 @@ const employeeMap = computed(() => employees.value.reduce((acc, item) => {
   return acc
 }, {}))
 
-const getDeptName = (deptId) => departments.value.find(item => item.deptId === deptId)?.deptName || '-'
-const getPositionName = (positionId) => positions.value.find(item => item.positionId === positionId)?.positionName || '-'
-
-const getEmployeeTag = (empId) => {
-  const emp = employeeMap.value[empId]
-  const deptName = getDeptName(emp?.deptId)
-  const positionName = getPositionName(emp?.positionId)
-  const roleCode = positionName.includes('经理') ? 'MANAGER' : 'EMPLOYEE'
-  return userStore.getIdentityTagByEmpId(empId, {
-    identityTag: emp?.identityTagCode || emp?.identityTag || '',
-    roleCode,
-    deptName,
-    positionName
-  })
-}
-
-const matchDays = (rule, days) => {
-  const value = Number(rule.daysValue || 0)
-  if (rule.daysOp === 'any') return true
-  if (rule.daysOp === '<=') return Number(days) <= value
-  if (rule.daysOp === '>') return Number(days) > value
-  return false
-}
-
-const getMatchedRule = (empId, days) => {
-  const applicantTag = getEmployeeTag(empId)
-  return [...approvalRules.value]
-    .map(rule => {
-      let score = 0
-      if (matchDays(rule, days)) {
-        if (rule.applicantTag === applicantTag) score = 2
-        else if (userStore.matchIdentityTag(rule.applicantTag, applicantTag)) score = 1
-      }
-      return { rule, score }
-    })
-    .filter(item => item.score > 0)
-    .sort((a, b) => (b.score - a.score) || ((a.rule.sortOrder ?? 0) - (b.rule.sortOrder ?? 0)))
-    .map(item => item.rule)[0]
-}
-
-const getApprovalChain = (leave) => {
-  const rule = getMatchedRule(leave.empId, Number(leave.days || 0))
-  return {
-    firstApproverTag: rule?.firstApproverTag || leave.pendingApproverTag || 'ADMIN',
-    firstApproverScope: 'company',
-    secondApproverTag: rule?.secondApproverTag || leave.nextApproverTag || '',
-    secondApproverScope: rule?.secondApproverScope || leave.nextApproverScope || 'dept'
-  }
-}
-
-const getNormalizedApprovalPayload = (leave) => {
-  const chain = getApprovalChain(leave)
-  if (leave.status === LEAVE_STATUS.pending1) {
-    return {
-      status: LEAVE_STATUS.pending1,
-      pendingApproverTag: chain.firstApproverTag,
-      pendingApproverScope: chain.firstApproverScope,
-      nextApproverTag: chain.secondApproverTag || '',
-      nextApproverScope: chain.secondApproverTag ? chain.secondApproverScope : '',
-      approveTime: leave.approveTime || ''
-    }
-  }
-  if (leave.status === LEAVE_STATUS.pending2) {
-    if (!chain.secondApproverTag) {
-      return {
-        status: LEAVE_STATUS.approved,
-        pendingApproverTag: '',
-        pendingApproverScope: 'company',
-        nextApproverTag: '',
-        nextApproverScope: '',
-        approveTime: leave.approveTime || new Date().toISOString().slice(0, 19)
-      }
-    }
-    return {
-      status: LEAVE_STATUS.pending2,
-      pendingApproverTag: chain.secondApproverTag,
-      pendingApproverScope: chain.secondApproverScope || 'company',
-      nextApproverTag: '',
-      nextApproverScope: '',
-      approveTime: leave.approveTime || ''
-    }
-  }
-  return null
-}
-
-const shouldNormalizeApproval = (leave) => {
-  const normalized = getNormalizedApprovalPayload(leave)
-  if (!normalized) return false
-  return normalized.status !== leave.status
-    || normalized.pendingApproverTag !== (leave.pendingApproverTag || '')
-    || normalized.pendingApproverScope !== (leave.pendingApproverScope || '')
-    || normalized.nextApproverTag !== (leave.nextApproverTag || '')
-    || normalized.nextApproverScope !== (leave.nextApproverScope || '')
-    || (normalized.approveTime || '') !== (leave.approveTime || '')
-}
-
-const normalizeLeaveRequests = async (items) => {
-  const pendingItems = (items || []).filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
-  const corrections = pendingItems.filter(shouldNormalizeApproval)
-  if (!corrections.length) return items || []
-
-  await Promise.all(corrections.map((item) => {
-    const normalized = getNormalizedApprovalPayload(item)
-    return updateLeaveRequestApi(item.leaveId, {
-      ...item,
-      ...normalized,
-      days: String(item.days)
-    })
-  }))
-
-  const refreshed = await listLeaveRequestsApi({ page: 1, size: 500 })
-  return refreshed.items || []
-}
-
 const pendingLeaves = computed(() => {
   return leaveRequests.value
     .filter(item => item.status === LEAVE_STATUS.pending1 || item.status === LEAVE_STATUS.pending2)
@@ -265,30 +133,18 @@ const pendingLeaves = computed(() => {
       const emp = employeeMap.value[item.empId]
       if (leaveScope.value === 'dept' && emp?.deptId !== userStore.deptId) return false
       if (leaveScope.value === 'self' && item.empId !== userStore.empId) return false
+      if (!item.pendingApproverTag || !userStore.canApproveTag(item.pendingApproverTag)) return false
 
-      const chain = getApprovalChain(item)
-      const pending = item.status === LEAVE_STATUS.pending1
-        ? { tag: chain.firstApproverTag, scope: 'company' }
-        : { tag: chain.secondApproverTag || item.pendingApproverTag, scope: chain.secondApproverScope || 'company' }
-
-      if (!pending.tag) return false
-      
-      // 检查当前用户的角色是否匹配期望的审批角色
-      if (pending.tag !== userStore.user?.roleCode) return false
-      
-      if (pending.scope === 'dept') return emp?.deptId === userStore.deptId
-      if (pending.scope === 'self') return item.empId === userStore.empId
+      const pendingScope = item.pendingApproverScope || 'company'
+      if (pendingScope === 'dept') return emp?.deptId === userStore.deptId
+      if (pendingScope === 'self') return item.empId === userStore.empId
       return true
     })
 })
 
 const getLeaveStatusLabel = (row) => {
-  if (row.status === LEAVE_STATUS.pending1 || row.status === LEAVE_STATUS.pending2) {
-    const chain = getApprovalChain(row)
-    const currentTag = row.status === LEAVE_STATUS.pending1
-      ? chain.firstApproverTag
-      : chain.secondApproverTag || row.pendingApproverTag
-    const tagLabel = currentTag ? (roleLabelMap[currentTag] || currentTag) : ''
+  if ((row.status === LEAVE_STATUS.pending1 || row.status === LEAVE_STATUS.pending2) && row.pendingApproverTag) {
+    const tagLabel = getTagLabel(row.pendingApproverTag)
     return tagLabel ? `待 ${tagLabel} 审批` : row.status
   }
   return row.status
@@ -309,25 +165,17 @@ const getNowTime = () => {
 const loadPageData = async () => {
   loading.value = true
   try {
-    const [summaryData, employeePage, departmentPage, positionPage, leavePage, attendancePage, salaryPage, rulePage] = await Promise.all([
+    const [summaryData, employeePage, leavePage, attendancePage] = await Promise.all([
       getReportSummaryApi(),
       listEmployeesApi({ page: 1, size: 200 }),
-      listDepartmentsApi({ page: 1, size: 200 }),
-      listPositionsApi({ page: 1, size: 200 }),
       listLeaveRequestsApi({ page: 1, size: 500 }),
-      listAttendanceApi({ page: 1, size: 500 }),
-      listSalaryRecordsApi({ page: 1, size: 500 }),
-      listApprovalRulesApi({ page: 1, size: 200, typeCode: 'leave' })
+      listAttendanceApi({ page: 1, size: 500 })
     ])
 
     summary.value = summaryData
     employees.value = employeePage.items || []
-    departments.value = departmentPage.items || []
-    positions.value = positionPage.items || []
     attendanceRecords.value = attendancePage.items || []
-    salaryRecords.value = salaryPage.items || []
-    approvalRules.value = rulePage.items || []
-    leaveRequests.value = await normalizeLeaveRequests(leavePage.items || [])
+    leaveRequests.value = leavePage.items || []
   } catch (error) {
     ElMessage.error(error.message || '首页数据加载失败')
   } finally {
@@ -410,20 +258,13 @@ const handleSubmitLeave = async () => {
 
   leaveSubmitting.value = true
   try {
-    const rule = getMatchedRule(userStore.empId, leaveForm.days)
     await createLeaveRequestApi({
       empId: userStore.empId,
       leaveType: leaveForm.leaveType,
       startDate: leaveForm.startDate,
       endDate: leaveForm.endDate,
       days: String(leaveForm.days),
-      reason: leaveForm.reason,
-      status: LEAVE_STATUS.pending1,
-      pendingApproverTag: rule?.firstApproverTag || 'HR',
-      pendingApproverScope: 'company',
-      nextApproverTag: rule?.secondApproverTag || '',
-      nextApproverScope: rule?.secondApproverScope || 'dept',
-      applyTime: new Date().toISOString().slice(0, 19)
+      reason: leaveForm.reason
     })
     leaveDialogVisible.value = false
     ElMessage.success('请假申请提交成功')

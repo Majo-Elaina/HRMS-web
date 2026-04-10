@@ -4,6 +4,13 @@ import { getProfileApi, loginApi } from '@/api/auth'
 import { listModuleScopeConfigsApi } from '@/api/moduleScope'
 import { listApprovalRuleTypesApi } from '@/api/approvalRuleType'
 import { listApprovalRulesApi } from '@/api/approvalRule'
+import {
+  canApproveTag as canApproveTagByProfile,
+  getIdentityTagAliases as getIdentityTagAliasesByCode,
+  matchIdentityTag as matchIdentityTagByCode,
+  normalizeTagCode,
+  resolveApprovalAssigneeTags
+} from '@/utils/approvalModel'
 
 const ALL_PERMISSIONS = [
   'dashboard', 'dashboard:view', 'dashboard:ai', 'dashboard:ai:view',
@@ -309,24 +316,9 @@ const resolveIdentityTag = ({ roleCode, deptName, positionName }) => {
   if (roleCode === 'MANAGER') return 'MANAGER'
   return 'EMPLOYEE'
 }
-const getIdentityTagAliases = (tag) => {
-  const aliasMap = {
-    ADMIN: ['ADMIN'],
-    GENERAL_MANAGER: ['GENERAL_MANAGER', 'ADMIN'],
-    HR_MANAGER: ['HR_MANAGER', 'MANAGER'],
-    HR_SPECIALIST: ['HR_SPECIALIST', 'EMPLOYEE'],
-    FINANCE_MANAGER: ['FINANCE_MANAGER', 'MANAGER'],
-    FINANCE_SPECIALIST: ['FINANCE_SPECIALIST', 'EMPLOYEE'],
-    MANAGER: ['MANAGER'],
-    EMPLOYEE: ['EMPLOYEE']
-  }
-  return aliasMap[tag] || [tag].filter(Boolean)
-}
+const getIdentityTagAliases = (tag) => getIdentityTagAliasesByCode(tag)
 
-const matchIdentityTag = (expectedTag, actualTag) => {
-  if (expectedTag === '*' || expectedTag === 'ANY') return true
-  return getIdentityTagAliases(actualTag).includes(expectedTag)
-}
+const matchIdentityTag = (expectedTag, actualTag) => matchIdentityTagByCode(expectedTag, actualTag)
 
 const getIdentityTagByEmpId = (empId, fallback) => {
   const storedTag = fallback?.identityTag
@@ -414,7 +406,8 @@ const normalizeUserProfile = (profile = {}) => ({
   ...profile,
   permissions: Array.isArray(profile.permissions)
     ? [...profile.permissions]
-    : getRolePermissions(profile.roleCode)
+    : getRolePermissions(profile.roleCode),
+  approvalAssigneeTags: resolveApprovalAssigneeTags(profile)
 })
 
 export const useUserStore = defineStore('user', () => {
@@ -426,6 +419,7 @@ export const useUserStore = defineStore('user', () => {
   const permissions = computed(() => user.value?.permissions || [])
   const roleCode = computed(() => user.value?.roleCode || '')
   const identityTag = computed(() => user.value?.identityTag || '')
+  const approvalAssigneeTags = computed(() => user.value?.approvalAssigneeTags || [])
   const empId = computed(() => user.value?.empId || null)
   const deptId = computed(() => user.value?.deptId || null)
   const deptName = computed(() => user.value?.deptName || '')
@@ -436,6 +430,7 @@ export const useUserStore = defineStore('user', () => {
 
   const hasIdentityTag = (tag) => matchIdentityTag(tag, identityTag.value)
   const getModuleScope = (moduleCode, tag = identityTag.value) => getModuleScopeByTag(moduleCode, tag)
+  const canApproveTag = (tag) => canApproveTagByProfile(user.value || {}, tag)
 
   const hydrateRemoteConfigs = async () => {
     try {
@@ -475,11 +470,11 @@ export const useUserStore = defineStore('user', () => {
       rulePages.forEach(([typeCode, items]) => {
         nextRules[typeCode] = items.map((item) => ({
           id: item.ruleId,
-          applicantTag: item.applicantTag,
+          applicantTag: normalizeTagCode(item.applicantTag),
           daysOp: item.daysOp,
           daysValue: Number(item.daysValue || 0),
-          firstApproverTag: item.firstApproverTag,
-          secondApproverTag: item.secondApproverTag || '',
+          firstApproverTag: normalizeTagCode(item.firstApproverTag),
+          secondApproverTag: normalizeTagCode(item.secondApproverTag || ''),
           secondApproverScope: item.secondApproverScope || 'dept',
           sortOrder: item.sortOrder || 0
         }))
@@ -505,7 +500,11 @@ export const useUserStore = defineStore('user', () => {
         
     user.value = {
       ...normalizeUserProfile(profile),
-      identityTag
+      identityTag,
+      approvalAssigneeTags: resolveApprovalAssigneeTags({
+        ...profile,
+        identityTag
+      })
     }
     localStorage.setItem('user', JSON.stringify(user.value))
   }
@@ -581,7 +580,8 @@ export const useUserStore = defineStore('user', () => {
         roleCode: user.value.roleCode,
         deptName: user.value.deptName,
         positionName: user.value.positionName
-      })
+      }),
+      approvalAssigneeTags: resolveApprovalAssigneeTags(user.value)
     }
     localStorage.setItem('user', JSON.stringify(user.value))
   }
@@ -618,6 +618,7 @@ export const useUserStore = defineStore('user', () => {
     permissions,
     roleCode,
     identityTag,
+    approvalAssigneeTags,
     empId,
     deptId,
     deptName,
@@ -634,7 +635,8 @@ export const useUserStore = defineStore('user', () => {
     matchIdentityTag,
     getIdentityTagByEmpId,
     getModuleScope,
-      }
+    canApproveTag
+  }
 })
 
 

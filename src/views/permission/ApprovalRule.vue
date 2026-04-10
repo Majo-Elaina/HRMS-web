@@ -1,24 +1,19 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { listRolesApi } from '@/api/role'
 import { createApprovalRuleApi, deleteApprovalRuleApi, listApprovalRulesApi, updateApprovalRuleApi } from '@/api/approvalRule'
 import { createApprovalRuleTypeApi, listApprovalRuleTypesApi } from '@/api/approvalRuleType'
 import { MODULE_SCOPE_OPTIONS } from '@/stores/user'
+import {
+  APPROVAL_TAG_OPTIONS,
+  getTagLabel as getApprovalTagLabel,
+  IDENTITY_TAG_OPTIONS,
+  normalizeTagCode
+} from '@/utils/approvalModel'
 
 const loading = ref(false)
 const saving = ref(false)
-const tagOptions = ref([
-  { tagCode: 'ADMIN', tagName: '管理员' },
-  { tagCode: 'GENERAL_MANAGER', tagName: '总经理' },
-  { tagCode: 'HR_MANAGER', tagName: 'HR经理' },
-  { tagCode: 'HR_SPECIALIST', tagName: 'HR专员' },
-  { tagCode: 'FINANCE_MANAGER', tagName: '财务经理' },
-  { tagCode: 'FINANCE_SPECIALIST', tagName: '财务专员' },
-  { tagCode: 'MANAGER', tagName: '部门经理' },
-  { tagCode: 'EMPLOYEE', tagName: '普通员工' }
-])
-const roleOptions = ref([])
+const tagOptions = ref(IDENTITY_TAG_OPTIONS)
 const ruleTypes = ref([])
 const selectedType = ref('leave')
 const rulesMap = ref({})
@@ -51,7 +46,7 @@ const applicantOptions = computed(() => [
 ])
 
 const approverOptions = computed(() => 
-  roleOptions.value.map((item) => ({ value: item.roleCode, label: item.roleName }))
+  APPROVAL_TAG_OPTIONS.map((item) => ({ value: item.tagCode, label: item.tagName }))
 )
 
 const isLeaveType = computed(() => selectedType.value === 'leave')
@@ -63,13 +58,11 @@ const daysOptions = [
 ]
 
 const getTagLabel = (value) => {
-  const found = tagOptions.value.find((item) => item.tagCode === value)
-  return found ? found.tagName : value || '-'
+  return getApprovalTagLabel(value)
 }
 
 const getRoleLabel = (value) => {
-  const found = roleOptions.value.find((item) => item.roleCode === value)
-  return found ? found.roleName : value || '-'
+  return getApprovalTagLabel(value)
 }
 
 const getDaysText = (row) => {
@@ -85,9 +78,9 @@ const getDefaultRuleForType = (type) => {
       applicantTag: '*',
       daysOp: '<=',
       daysValue: 3,
-      firstApproverTag: 'HR',
+      firstApproverTag: 'HR_SPECIALIST',
       secondApproverTag: '',
-      secondApproverScope: 'dept'
+      secondApproverScope: 'company'
     }
   }
 
@@ -103,11 +96,11 @@ const getDefaultRuleForType = (type) => {
 
 const normalizeRule = (rule) => ({
   id: rule.ruleId,
-  applicantTag: rule.applicantTag,
+  applicantTag: normalizeTagCode(rule.applicantTag),
   daysOp: rule.daysOp || 'any',
   daysValue: Number(rule.daysValue || 0),
-  firstApproverTag: rule.firstApproverTag,
-  secondApproverTag: rule.secondApproverTag || '',
+  firstApproverTag: normalizeTagCode(rule.firstApproverTag),
+  secondApproverTag: normalizeTagCode(rule.secondApproverTag || ''),
   secondApproverScope: rule.secondApproverScope || 'dept',
   sortOrder: rule.sortOrder || 0
 })
@@ -137,9 +130,7 @@ const loadRulesByType = async (typeCode) => {
 const loadPageData = async () => {
   loading.value = true
   try {
-    const rolesPage = await listRolesApi({ page: 1, size: 100 })
     await loadRuleTypes()
-    roleOptions.value = rolesPage.items || []
     await loadRulesByType(selectedType.value)
   } catch (error) {
     ElMessage.error(error.message || '加载审批规则失败')

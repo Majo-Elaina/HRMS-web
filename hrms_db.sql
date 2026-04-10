@@ -140,19 +140,23 @@ CREATE TABLE `approval_rule`  (
   INDEX `idx_approval_rule_type_code`(`type_code` ASC) USING BTREE,
   INDEX `idx_approval_rule_applicant_tag`(`applicant_tag` ASC) USING BTREE,
   CONSTRAINT `fk_approval_rule_type` FOREIGN KEY (`type_code`) REFERENCES `approval_rule_type` (`type_code`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of approval_rule
 -- ----------------------------
-INSERT INTO `approval_rule` VALUES (1, 'leave', 'EMPLOYEE', '<=', 3.00, 'HR_SPECIALIST', 'HR_MANAGER', 'company', 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
-INSERT INTO `approval_rule` VALUES (2, 'leave', 'EMPLOYEE', '>', 3.00, 'HR_SPECIALIST', 'HR_MANAGER', 'company', 2, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
-INSERT INTO `approval_rule` VALUES (3, 'leave', 'MANAGER', 'any', 0.00, 'HR_MANAGER', 'GENERAL_MANAGER', 'company', 3, '2024-01-01 09:00:00', '2026-03-14 01:07:06');
-INSERT INTO `approval_rule` VALUES (4, 'leave', 'HR_MANAGER', 'any', 0.00, 'GENERAL_MANAGER', NULL, NULL, 4, '2024-01-01 09:00:00', '2026-03-14 01:07:25');
-INSERT INTO `approval_rule` VALUES (5, 'leave', 'ADMIN', 'any', 0.00, 'GENERAL_MANAGER', NULL, NULL, 0, '2024-01-01 09:00:00', '2026-03-14 01:07:53');
-INSERT INTO `approval_rule` VALUES (6, 'salary_record', 'FINANCE_SPECIALIST', 'any', 0.00, 'FINANCE_MANAGER', NULL, 'company', 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
-INSERT INTO `approval_rule` VALUES (7, 'salary_config', 'FINANCE_SPECIALIST', 'any', 0.00, 'FINANCE_MANAGER', NULL, 'company', 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
-INSERT INTO `approval_rule` VALUES (8, 'leave', 'GENERAL_MANAGER', 'any', 0.00, 'HR_MANAGER', NULL, NULL, 6, '2026-03-14 01:08:31', '2026-03-14 01:08:31');
+INSERT INTO `approval_rule` VALUES (1, 'leave', 'ADMIN', 'any', 0.00, 'GENERAL_MANAGER', NULL, NULL, 0, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (2, 'leave', 'FINANCE_SPECIALIST', '<=', 3.00, 'HR_SPECIALIST', 'HR_MANAGER', 'company', 1, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (3, 'leave', 'FINANCE_SPECIALIST', '>', 3.00, 'HR_SPECIALIST', 'HR_MANAGER', 'company', 2, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (4, 'leave', 'HR_SPECIALIST', 'any', 0.00, 'HR_MANAGER', 'GENERAL_MANAGER', 'company', 3, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (5, 'leave', 'EMPLOYEE', '<=', 3.00, 'HR_SPECIALIST', 'HR_MANAGER', 'company', 4, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (6, 'leave', 'EMPLOYEE', '>', 3.00, 'HR_SPECIALIST', 'HR_MANAGER', 'company', 5, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (7, 'leave', 'MANAGER', 'any', 0.00, 'HR_MANAGER', 'GENERAL_MANAGER', 'company', 6, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (8, 'leave', 'FINANCE_MANAGER', 'any', 0.00, 'HR_MANAGER', 'GENERAL_MANAGER', 'company', 7, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (9, 'leave', 'HR_MANAGER', 'any', 0.00, 'GENERAL_MANAGER', NULL, NULL, 8, '2024-01-01 09:00:00', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (10, 'leave', 'GENERAL_MANAGER', 'any', 0.00, 'HR_MANAGER', NULL, NULL, 9, '2026-03-14 01:08:31', '2026-04-10 10:00:00');
+INSERT INTO `approval_rule` VALUES (11, 'salary_record', 'FINANCE_SPECIALIST', 'any', 0.00, 'FINANCE_MANAGER', NULL, 'company', 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
+INSERT INTO `approval_rule` VALUES (12, 'salary_config', 'FINANCE_SPECIALIST', 'any', 0.00, 'FINANCE_MANAGER', NULL, 'company', 1, '2024-01-01 09:00:00', '2024-01-01 09:00:00');
 
 -- ----------------------------
 -- Table structure for approval_rule_type
@@ -420,12 +424,12 @@ CREATE TABLE `leave_request`  (
 -- Records of leave_request
 -- ----------------------------
 INSERT INTO `leave_request` VALUES (1, 5, '年假', '2024-01-15', '2024-01-17', 3.00, '回老家探亲', '已通过', 2, NULL, NULL, NULL, NULL, '2024-01-10 09:30:00', '2024-01-11 14:00:00', '资料齐全，同意请假');
-INSERT INTO `leave_request` VALUES (2, 3, '病假', '2024-01-20', '2024-01-21', 2.00, '感冒发烧需要休息', '待审批', NULL, 'HR_SPECIALIST', 'company', 'HR_MANAGER', 'company', '2024-01-18 14:20:00', NULL, NULL);
+INSERT INTO `leave_request` VALUES (2, 3, '病假', '2024-01-20', '2024-01-21', 2.00, '感冒发烧需要休息', '待审批', NULL, 'HR_MANAGER', 'company', 'GENERAL_MANAGER', 'company', '2024-01-18 14:20:00', NULL, NULL);
 INSERT INTO `leave_request` VALUES (3, 8, '事假', '2024-01-22', '2024-01-22', 1.00, '处理个人事务', '已通过', 3, NULL, NULL, NULL, NULL, '2024-01-19 10:00:00', '2024-01-19 16:10:00', '先由HR继续处理');
 INSERT INTO `leave_request` VALUES (4, 10, '婚假', '2024-02-01', '2024-02-10', 10.00, '办理婚礼', '待审批', NULL, 'HR_SPECIALIST', 'company', 'HR_MANAGER', 'company', '2024-01-20 16:00:00', NULL, NULL);
 INSERT INTO `leave_request` VALUES (5, 7, '年假', '2024-01-25', '2024-01-26', 2.00, '个人休假', '已拒绝', 3, NULL, NULL, NULL, NULL, '2024-01-15 11:30:00', '2024-01-16 09:30:00', '项目关键期暂不批准');
 INSERT INTO `leave_request` VALUES (6, 1, '年假', '2024-03-01', '2024-03-03', 3.00, '总经理请假测试', '待审批', NULL, 'HR_MANAGER', 'company', NULL, NULL, '2024-02-28 10:00:00', NULL, NULL);
-INSERT INTO `leave_request` VALUES (7, 15, '事假', '2024-03-05', '2024-03-05', 1.00, 'HR经理请假测试', '待审批', NULL, 'ADMIN', 'company', NULL, NULL, '2024-03-04 14:00:00', NULL, NULL);
+INSERT INTO `leave_request` VALUES (7, 15, '事假', '2024-03-05', '2024-03-05', 1.00, 'HR经理请假测试', '待审批', NULL, 'GENERAL_MANAGER', 'company', NULL, NULL, '2024-03-04 14:00:00', NULL, NULL);
 
 -- ----------------------------
 -- Table structure for module_scope_detail
