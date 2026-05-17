@@ -1,202 +1,169 @@
-# 企业人事管理系统 HRMS Web
+# HRMS-Web 企业人事管理系统（前端）
 
-这是一个企业人事管理系统的前端项目，基于 `Vue 3 + Vite + Pinia + Vue Router + Element Plus` 构建，对接后端接口与 MySQL 数据库，覆盖人事、权限、考勤、请假、薪资、报表等核心场景。
+<p align="center">
+  <img src="https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js" alt="Vue 3" />
+  <img src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite" alt="Vite" />
+  <img src="https://img.shields.io/badge/Element%20Plus-2.13-409EFF?logo=element" alt="Element Plus" />
+  <img src="https://img.shields.io/badge/ECharts-6-AA344D?logo=apacheecharts" alt="ECharts" />
+  <img src="https://img.shields.io/badge/Pinia-3-FFD859" alt="Pinia" />
+</p>
 
-项目当前已经从原型式前端页面演进为数据库驱动的业务系统，主要特征是：
+## 📖 项目简介
 
-- 角色权限由数据库 `role_permission` 驱动
-- 员工身份通过 `employee.identity_tag_code` 统一建模
-- 模块范围通过配置控制“本人 / 部门 / 公司”数据访问边界
-- 请假审批、薪资审批通过 `approval_rule` 配置化驱动
-- Dashboard / Report 基于真实业务数据汇总展示
+HRMS-Web 是一套面向中小企业的人事管理系统前端，基于 Vue 3 生态构建。系统覆盖组织管理、考勤、薪酬、OA 审批、权限配置和数据报表等核心人事场景，并集成了具有独立人格设定的 AI 智能助手「亚托莉」，支持自然语言查询公司数据、天气查询和 AI 代理执行操作。
 
-## 功能概览
+## ✨ 核心功能
 
-### 1. 基础信息管理
+### 🏢 组织与人事管理
 
-- 员工管理：员工档案、状态维护、身份标签联动
-- 部门管理：部门维护与层级管理
-- 职位管理：职位维护与组织归属
+- **员工管理** — 员工信息录入、编辑、状态管理
+- **部门管理** — 组织架构维护、部门层级管理
+- **职位管理** — 岗位定义与职位体系配置
 
-### 2. 考勤与请假
+### 📅 考勤管理
 
-- 考勤记录：签到、签退、状态判断、记录维护
-- 请假管理：发起申请、取消申请、逐级审批
-- 首页快捷入口：个人签到/签退、个人请假申请
+- **考勤记录** — 打卡记录查看、考勤状态统计
+- **请假管理** — 请假申请、多级审批流转、撤销操作
 
-### 3. 薪资管理
+### 💰 薪酬管理
 
-- 薪资记录：录入、提交、审批、发放
-- 薪资配置：配置项维护、提交审批、生效管理
+- **薪资记录** — 工资条查看、提交审批、发放流程
+- **薪资配置** — 薪资计算规则维护、配置审批
 
-### 4. 权限与配置
+### 🔐 权限管理
 
-- 用户管理
-- 角色管理与权限配置
-- 身份标签管理
-- 部门权限模板
-- 模块范围配置
-- 审批规则配置
+- **用户管理** — 系统账号创建与维护
+- **角色管理** — 角色定义与权限码分配
+- **部门权限模板** — 按部门批量配置权限
+- **模块数据范围** — 控制不同身份可见的数据范围（本人/本部门/全公司）
+- **审批规则** — 可配置的多级审批链条（支持请假、薪资等业务类型）
 
-### 5. 数据展示
+### 📊 数据中心
 
-- Dashboard：首页指标、图表、待办事项
-- Report：统计报表与业务汇总
+- **Dashboard 仪表盘** — 员工统计、部门分布、考勤概览、待办事项
+- **数据报表** — ECharts 可视化图表，多维度经营数据展示
 
-## 项目结构
+### 🤖 智能助手「亚托莉」
 
-```text
-HRMS-web/
-├─ src/
-│  ├─ api/                 # 前端 API 封装
-│  ├─ assets/              # 全局样式与静态资源
-│  ├─ layout/              # 主布局
-│  ├─ router/              # 路由与菜单入口
-│  ├─ stores/              # Pinia 状态管理
-│  ├─ utils/               # 工具函数
-│  └─ views/               # 业务页面
-├─ ai-docs/                # 接口、架构、审批、复盘等文档
-├─ hrms-db.sql             # 数据库初始化与升级脚本
-├─ vite.config.js          # Vite 配置与开发代理
-└─ README.md               # 项目说明
-```
+系统集成了一个具有完整人格设定的 AI 聊天助手，核心能力包括：
 
-`src/views` 主要按业务域划分：
+#### 💬 智能聊天
 
-- `base/`：员工、部门、职位
-- `attendance/`：考勤记录、请假管理
-- `salary/`：薪资记录、薪资配置
-- `permission/`：用户、角色、身份标签、模块范围、审批规则等
+- 基于《ATRI -My Dear Moments-》角色设定，亚托莉陪伴式对话
+- 情绪安抚、日常聊天、流程解释等多场景自然交互
+- 聊天记录持久化，刷新页面或重新登录后自动恢复历史
 
-## 技术栈
+#### 📊 公司数据实时查询
 
-- Vue 3
-- Vite 7
-- Pinia
-- Vue Router 4
-- Element Plus
-- Axios
-- ECharts / vue-echarts
+- **全业务域覆盖** — 员工、部门、考勤、请假、薪资、审批规则等
+- **动态数据获取** — 每次回答实时查询数据库最新数据，无需重启服务
+- **权限边界控制** — 严格按照当前用户角色和数据范围返回信息
+- **数据来源标注** — 回答中标注数据来源，区分系统事实与通用建议
 
-## 运行环境
+#### 🌤️ 天气查询
 
-- Node.js：`^20.19.0` 或 `>=22.12.0`
-- npm
-- 后端服务：默认 `http://localhost:8080`
-- 数据库：MySQL
+- 集成高德地图天气 API，支持全国主要城市实时天气查询
+- 自然语言识别城市名称，如"今天成都天气怎么样？"
 
-前端开发代理已配置：
+#### 🤖 AI 代理执行（Agent）
 
-- `/api -> http://localhost:8080`
+- **自然语言下达指令** — 如"帮我提交 2 天病假申请"、"为财务专员增加薪资记录查看权限"
+- **结构化执行计划** — Agent 先生成操作步骤、影响范围和风险说明
+- **人工审批门禁** — 用户确认后才执行，确保操作安全可控
+- **全量审计日志** — 记录每一步执行过程和结果
 
-并且开发模式会自动打开浏览器。
+#### 🎨 现代化 UI
 
-## 快速开始
+- 角色 Hero 区 + 人物资料卡 + 聊天区三栏布局
+- 思考状态动画、消息来源提示、建议问题列表
+- 模型状态实时显示
 
-### 1. 准备数据库
+## 🛠️ 技术栈
 
-执行项目根目录下的数据库脚本：
+| 类别 | 技术 |
+|------|------|
+| 框架 | Vue 3 (Composition API) |
+| 构建工具 | Vite 7 |
+| UI 组件库 | Element Plus 2.13 |
+| 状态管理 | Pinia 3 |
+| 路由 | Vue Router 4 |
+| HTTP 客户端 | Axios |
+| 图表 | ECharts 6 + vue-echarts |
+| 图标 | @element-plus/icons-vue |
 
-```sql
-hrms-db.sql
-```
+## 🚀 快速开始
 
-说明：
+### 环境要求
 
-- 该脚本包含初始化表结构、基础数据、权限、审批规则、身份标签等内容
-- 如果你的数据库已经有旧版本数据，至少要补齐脚本里的升级部分，例如 `employee.identity_tag_code`
+- Node.js >= 20.19.0 或 >= 22.12.0
 
-### 2. 启动后端
-
-确保后端项目已经启动，并监听：
-
-```text
-http://localhost:8080
-```
-
-如果后端地址不是这个端口，需要同步修改 [vite.config.js](/d:/Work/Projects/HRMS/HRMS-web/vite.config.js) 中的代理目标。
-
-### 3. 安装依赖
-
-在当前目录执行：
+### 安装与运行
 
 ```bash
+# 克隆项目
+git clone https://github.com/your-username/HRMS-web.git
+cd HRMS-web
+
+# 安装依赖
 npm install
-```
 
-### 4. 启动前端开发环境
-
-```bash
+# 启动开发服务器
 npm run dev
-```
 
-启动后会自动打开浏览器。
-
-### 5. 构建生产版本
-
-```bash
+# 构建生产版本
 npm run build
-```
 
-### 6. 预览生产构建
-
-```bash
+# 预览生产构建
 npm run preview
 ```
 
-## 默认测试账号 / 角色说明
+### 后端配合
 
-数据库初始化脚本 `hrms-db.sql` 内置了一组默认测试账号，可用于快速验证不同角色的菜单、权限、审批链和数据范围。
+前端默认连接 `http://localhost:8080` 后端服务，请确保 [HRMS-backend](https://github.com/your-username/HRMS-backend) 已启动。
 
-| 用户名 | 密码 | 角色 | 典型用途 |
-| --- | --- | --- | --- |
-| `admin` | `admin123` | 系统管理员 `ADMIN` | 查看全系统、配置角色权限、审批规则、模块范围 |
-| `hr_lina` | `123456` | HR专员 `HR` | 员工管理、请假一级审批、考勤维护 |
-| `hr_manager` | `123456` | HR经理 `HR_MANAGER` | 请假高级审批、人事管理 |
-| `manager_zhao` | `123456` | 部门经理 `MANAGER` | 本部门员工查看、部门相关审批 |
-| `emp_zhou` | `123456` | 普通员工 `EMPLOYEE` | 个人签到、请假申请、个人薪资查看 |
-| `finance_liu` | `123456` | 财务经理 `FINANCE_MANAGER` | 薪资审批、薪资发放 |
-| `finance_chen` | `123456` | 财务专员 `FINANCE` | 薪资记录录入、薪资配置提交 |
+## 📁 项目结构
 
-说明：
+```
+src/
+├── api/                # API 接口层
+│   ├── aiChat.js       # AI 聊天接口
+│   ├── auth.js         # 认证接口
+│   ├── employee.js     # 员工接口
+│   ├── attendance.js   # 考勤接口
+│   ├── leave.js        # 请假接口
+│   ├── salaryRecord.js # 薪资记录接口
+│   └── ...
+├── components/         # 公共组件
+│   ├── ai/             # AI 助手组件
+│   │   └── AtriChatPanel.vue
+│   ├── dashboard/      # 仪表盘组件
+│   └── icons/          # 图标组件
+├── layout/             # 布局组件
+├── router/             # 路由配置（含权限守卫）
+├── stores/             # Pinia 状态管理
+├── utils/              # 工具函数
+└── views/              # 页面视图
+    ├── AiAssistant.vue # AI 助手页面
+    ├── Dashboard.vue   # 仪表盘
+    ├── Login.vue       # 登录页
+    ├── Report.vue      # 数据报表
+    ├── base/           # 基础信息管理
+    ├── attendance/     # 考勤管理
+    ├── salary/         # 薪酬管理
+    └── permission/     # 权限管理
+```
 
-- 这些账号依赖 `hrms-db.sql` 中的初始化用户数据
-- 角色权限最终以数据库 `role_permission` 为准
-- 业务审批身份最终以 `employee.identity_tag_code` 为准，不完全等同于登录角色
-- 如果你修改了初始化 SQL、身份标签或角色权限，以上账号行为也会随之变化
+## 🔒 权限控制模型
 
-## 文档入口
+系统采用四层权限协同模型：
 
-详细接口与系统说明统一维护在 [ai-docs/README.md](/d:/Work/Projects/HRMS/HRMS-web/ai-docs/README.md)，包括：
+1. **角色权限** — 控制菜单和按钮的可见性（如 `attendance:leave:approve`）
+2. **身份标签** — 标记业务身份（如 HR_SPECIALIST、MANAGER）
+3. **模块数据范围** — 控制可见数据范围（本人/本部门/全公司）
+4. **审批规则** — 决定业务单据的流转路径
 
-- 认证与权限接口
-- 组织与员工接口
-- 考勤、请假、薪资接口
-- 模块范围与审批规则接口
-- 系统 OA / 架构说明
-- AI agent 接入方案
-- 请假审批规则说明
-- 项目重点问题复盘
+前端路由守卫根据 `meta.permission` 控制页面访问，按钮级权限通过 `v-if` 动态渲染。
 
-## 当前实现特点
+## 📄 License
 
-- 登录态缓存保留在前端，但业务数据以后端和数据库为准
-- 角色权限、模块范围、审批规则均支持配置化
-- 请假审批支持多级审批与历史单据自动纠偏
-- 首页快捷操作与业务菜单共用同一套数据结构和后端接口
-
-## 注意事项
-
-- 当前后端配置为 `spring.jpa.hibernate.ddl-auto=none`
-- 数据库结构变更不会自动建表，必须手动执行 SQL
-- 如果前端页面与数据库规则不一致，优先检查：
-  - `approval_rule`
-  - `role_permission`
-  - `employee.identity_tag_code`
-  - `module_scope_rule / module_scope_detail`
-
-## 相关文件
-
-- 数据库脚本：[hrms-db.sql](/d:/Work/Projects/HRMS/HRMS-web/hrms-db.sql)
-- 文档目录：[ai-docs/README.md](/d:/Work/Projects/HRMS/HRMS-web/ai-docs/README.md)
-- Vite 配置：[vite.config.js](/d:/Work/Projects/HRMS/HRMS-web/vite.config.js)
+MIT
